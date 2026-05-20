@@ -1,0 +1,17 @@
+{
+  "name": "filemgr",
+  "version": "1.0.0",
+  "description": "A CLI file manager supporting list, cd, mkdir, touch, rm, mv, cat commands",
+  "main": "index.js",
+  "bin": {
+    "filemgr": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["cli", "file-manager", "terminal"],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0"
+  }
+}

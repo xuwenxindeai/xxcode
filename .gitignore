@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.agent-config.json
+.agent-plugins/
+.agent-data/
+.agent-sessions/
+*.log

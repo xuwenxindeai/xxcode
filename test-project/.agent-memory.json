@@ -1,0 +1,17 @@
+{
+  "projectName": "test-project",
+  "detectedAt": "2026-05-19T14:17:18.194Z",
+  "lastUpdated": "2026-05-19T14:17:18.195Z",
+  "language": [
+    "未知"
+  ],
+  "framework": [],
+  "packageManager": "unknown",
+  "entryPoints": [],
+  "keyModules": [],
+  "conventions": [],
+  "testPattern": "",
+  "recentTasks": [],
+  "commonErrors": [],
+  "userNotes": []
+}

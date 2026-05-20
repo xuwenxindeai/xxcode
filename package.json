@@ -1,0 +1,26 @@
+{
+  "name": "xxcode",
+  "version": "1.9.0",
+  "description": "AI 编程 CLI 工具 - 从零手写的智能编程助手",
+  "bin": {
+    "xxcode": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/node": "^25.9.0",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "glob": "^13.0.6",
+    "openai": "^6.38.0",
+    "typescript": "^6.0.3"
+  }
+}
