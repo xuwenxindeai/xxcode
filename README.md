@@ -13,6 +13,49 @@
 
 **用自然语言写代码。** 告诉 xxcode 你想做什么，它自己读文件、改代码、跑测试、提交 Git。
 
+## 快速开始
+
+### 1. 安装
+
+```bash
+git clone --depth 1 https://github.com/xuwenxindeai/xxcode.git
+cd xxcode
+npm install
+```
+
+### 2. 运行
+
+```bash
+# 进入你的项目目录
+cd /path/to/your/project
+
+# 启动 xxcode
+xxcode
+```
+
+> 也可以在任何目录下用 `npx` 直接运行：
+> ```bash
+> npx github:xuwenxindeai/xxcode
+> ```
+
+### 3. 首次配置
+
+首次运行会自动引导配置 API Key，支持：
+
+- **阿里云百炼 (DashScope)** — 推荐
+- **OpenAI**
+- **自定义 OpenAI 兼容接口**
+
+配置保存在 `~/.xxcode/config.json`，下次启动自动使用。
+
+也可以手动设置环境变量：
+
+```bash
+export DASHSCOPE_API_KEY="sk-xxx"
+export DASHSCOPE_BASE_URL="https://coding.dashscope.aliyuncs.com/v1"
+export DASHSCOPE_MODEL="qwen3.5-plus"
+```
+
 ## 能力一览
 
 | 能力 | 说明 |
@@ -26,61 +69,41 @@
 | 🖼️ **视觉理解** | 截图 + 分析，支持 OpenAI 多模态标准 |
 | 📝 **REPL 交互** | 15+ 内置命令：`/plan`、`/history`、`/stats`、`/undo`... |
 
-## 快速开始
+## 使用示例
 
-### 1. 克隆
-
-```bash
-git clone https://github.com/xuwenxindeai/xxcode.git
-cd xxcode
-```
-
-### 2. 安装依赖
+### 交互模式
 
 ```bash
-npm install
-npm run build
+cd my-project
+xxcode
 ```
 
-### 3. 配置 API Key
+然后在对话框中输入任务，xxcode 会自动读写文件、执行命令、提交代码。
+
+### 一次性任务
 
 ```bash
-# 阿里云百炼 DashScope
-export DASHSCOPE_API_KEY="sk-xxx"
-export DASHSCOPE_BASE_URL="https://coding.dashscope.aliyuncs.com/v1"
-export DASHSCOPE_MODEL="qwen3.5-plus"
+xxcode -t "创建一个 Express TODO REST API" -d ./my-api
 ```
 
-### 4. 运行
+### 指定模型
 
 ```bash
-# 一次性任务
-./dist/index.js "创建一个 Express TODO REST API"
-
-# 交互模式（推荐）
-./dist/index.js --repl
+xxcode -m qwen-max
 ```
 
-## 效果预览
+## 常用命令
 
-```
-╔══════════════════════════════════════════════════╗
-║  ✨ xxcode v1.9.0                                ║
-║  🧠 qwen3.5-plus                                 ║
-╚══════════════════════════════════════════════════╝
-
-  📋 任务: 创建一个 Express TODO REST API
-  📂 目录: /Users/xwx/projects/todo-api
-  ⚙️  状态: 分析中... [████████░░░░] 67%
-
-  ┌─ Agent 输出 ───────────────────────────────────┐
-  │ 📖 读取 package.json...                        │
-  │ 📝 创建 src/app.ts...                          │
-  │ ✅ 安装依赖 express                            │
-  │ 🧪 运行测试... 通过                            │
-  │ 💾 Git 提交完成                                 │
-  └────────────────────────────────────────────────┘
-```
+| 命令 | 说明 |
+|------|------|
+| `/plan` | 生成实现计划（不写代码） |
+| `/history` | 查看对话历史 |
+| `/stats` | 查看 Token 统计 |
+| `/tools` | 列出所有可用工具 |
+| `/undo` | 撤销上一步操作 |
+| `/clear` | 清空对话历史 |
+| `/plugins` | 管理插件 |
+| `/quit` | 退出 |
 
 ## 技术栈
 

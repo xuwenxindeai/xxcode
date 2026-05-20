@@ -6,22 +6,24 @@ import { loadConfig } from './config';
 import { connectMCP } from './mcp';
 import { ConfigWizard } from './wizard';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+import readline from 'readline';
 
 const program = new Command();
 
 program
-  .name('coding-agent')
-  .description('从零手写的 AI 编程 Agent — 完整可用版')
-  .version('1.6.0');
+  .name('xxcode')
+  .description('AI 编程 Agent — 从零手写，81+ 工具，TUI 仪表盘，插件系统')
+  .version('1.9.0');
 
 program
   .option('-t, --task <string>', '编程任务描述')
   .option('-i, --interactive', '交互模式 (REPL)')
   .option('-d, --dir <string>', '工作目录', process.cwd())
-  .option('-m, --model <string>', 'LLM 模型', 'gpt-4o')
-  .option('-k, --api-key <string>', 'OpenAI API Key')
-  .option('-b, --base-url <string>', 'API Base URL (兼容接口)')
+  .option('-m, --model <string>', 'LLM 模型')
+  .option('-k, --api-key <string>', 'API Key')
+  .option('-b, --base-url <string>', 'API Base URL')
   .option('-n, --max-iter <number>', '最大迭代轮数', '30')
   .option('--auto-test', '自动运行测试')
   .option('--no-auto-test', '不自动运行测试')
@@ -32,7 +34,72 @@ program
 
 const opts = program.opts();
 
-// 配置向导
+// ─── 全局配置 (类似 opencode 的 ~/.opencode/config.json) ───
+const XXCODE_DIR = path.join(os.homedir(), '.xxcode');
+const XXCODE_CONFIG = path.join(XXCODE_DIR, 'config.json');
+
+interface GlobalConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  setupComplete?: boolean;
+}
+
+function loadGlobalConfig(): GlobalConfig {
+  try {
+    if (fs.existsSync(XXCODE_CONFIG)) {
+      return JSON.parse(fs.readFileSync(XXCODE_CONFIG, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+function saveGlobalConfig(cfg: GlobalConfig) {
+  if (!fs.existsSync(XXCODE_DIR)) fs.mkdirSync(XXCODE_DIR, { recursive: true });
+  fs.writeFileSync(XXCODE_CONFIG, JSON.stringify(cfg, null, 2));
+}
+
+async function prompt(question: string): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => {
+    rl.question(chalk.green(question), answer => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+async function firstRunSetup(): Promise<GlobalConfig> {
+  console.log(chalk.bold.cyan('\n🚀 欢迎使用 xxcode！首次使用需要配置 API Key\n'));
+  console.log(chalk.gray('  1. 阿里云百炼 (DashScope) — 推荐'));
+  console.log(chalk.gray('  2. OpenAI'));
+  console.log(chalk.gray('  3. 自定义 OpenAI 兼容接口\n'));
+
+  const choice = await prompt('请选择 [1/2/3]: ');
+
+  let cfg: GlobalConfig = { setupComplete: true };
+
+  if (choice === '1' || !choice) {
+    cfg.apiKey = await prompt('DashScope API Key: ');
+    if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
+    cfg.model = await prompt('模型 [qwen3.5-plus]: ') || 'qwen3.5-plus';
+    cfg.baseUrl = 'https://coding.dashscope.aliyuncs.com/v1';
+  } else if (choice === '2') {
+    cfg.apiKey = await prompt('OpenAI API Key: ');
+    if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
+    cfg.model = await prompt('模型 [gpt-4o]: ') || 'gpt-4o';
+    cfg.baseUrl = 'https://api.openai.com/v1';
+  } else {
+    cfg.apiKey = await prompt('API Key: ');
+    if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
+    cfg.baseUrl = await prompt('Base URL: ');
+    cfg.model = await prompt('模型: ');
+  }
+
+  return cfg;
+}
+
+// 配置向导（独立模式）
 if (opts.setup) {
   const wizard = new ConfigWizard();
   wizard.run(path.resolve(opts.dir)).catch(err => {
@@ -47,63 +114,84 @@ if (!opts.task && !opts.interactive) {
   opts.interactive = true;
 }
 
-// 读取 API Key
-let apiKey = opts.apiKey || process.env.OPENAI_API_KEY;
+// 读取配置（优先级：命令行 > 环境变量 > 全局配置 > 项目 .env）
+let apiKey = opts.apiKey
+  || process.env.OPENAI_API_KEY
+  || process.env.DASHSCOPE_API_KEY;
+
+let baseUrl = opts.baseUrl
+  || process.env.OPENAI_BASE_URL
+  || process.env.DASHSCOPE_BASE_URL;
+
+let model = opts.model
+  || process.env.DASHSCOPE_MODEL
+  || 'gpt-4o';
+
+// 从全局配置读取
+const globalCfg = loadGlobalConfig();
+if (globalCfg.apiKey && !apiKey) {
+  apiKey = globalCfg.apiKey;
+  if (globalCfg.baseUrl && !baseUrl) baseUrl = globalCfg.baseUrl;
+  if (globalCfg.model && !opts.model) model = globalCfg.model;
+}
+
+// 从项目 .env 读取
 if (!apiKey) {
   const envPath = path.join(opts.dir, '.env');
   if (fs.existsSync(envPath)) {
     const env = fs.readFileSync(envPath, 'utf-8');
-    const match = env.match(/OPENAI_API_KEY\s*=\s*(.+)/);
-    if (match) apiKey = match[1].trim();
+    const keyMatch = env.match(/(?:OPENAI_API_KEY|DASHSCOPE_API_KEY)\s*=\s*(.+)/);
+    if (keyMatch) apiKey = keyMatch[1].trim();
   }
 }
 
-if (!apiKey) {
-  console.error(chalk.red('❌ 未找到 API Key'));
-  console.error('   请通过以下方式之一提供：');
-  console.error('   1. 命令行: -k YOUR_KEY');
-  console.error('   2. 环境变量: export OPENAI_API_KEY=xxx');
-  console.error('   3. 工作目录 .env 文件: OPENAI_API_KEY=xxx');
-  console.error('   4. 配置向导: node dist/index.js --setup');
-  process.exit(1);
-}
+// 首次运行引导
+(async () => {
+  if (!apiKey) {
+    const cfg = await firstRunSetup();
+    saveGlobalConfig(cfg);
+    apiKey = cfg.apiKey!;
+    baseUrl = cfg.baseUrl || baseUrl;
+    model = cfg.model || model;
+    console.log(chalk.green('\n✅ 配置已保存到 ~/.xxcode/config.json'));
+    console.log(chalk.gray('   下次启动将自动使用此配置\n'));
+  }
 
-// 加载配置
-const agentConfig = loadConfig(opts.dir, {
-  model: opts.model,
-  apiKey,
-  baseUrl: opts.baseUrl,
-  cwd: path.resolve(opts.dir),
-  maxIterations: parseInt(opts.maxIter),
-  autoTest: opts.autoTest,
-  autoCommit: opts.autoCommit,
-  skipApproval: opts.skipApproval,
-});
+  // 加载配置
+  const agentConfig = loadConfig(opts.dir, {
+    model,
+    apiKey: apiKey!,
+    baseUrl,
+    cwd: path.resolve(opts.dir),
+    maxIterations: parseInt(opts.maxIter),
+    autoTest: opts.autoTest,
+    autoCommit: opts.autoCommit,
+    skipApproval: opts.skipApproval,
+  });
 
-const config = {
-  model: agentConfig.model,
-  apiKey: agentConfig.apiKey,
-  baseURL: agentConfig.baseUrl,
-  cwd: agentConfig.cwd,
-  maxIterations: agentConfig.maxIterations,
-};
+  const config = {
+    model: agentConfig.model,
+    apiKey: agentConfig.apiKey,
+    baseURL: agentConfig.baseUrl,
+    cwd: agentConfig.cwd,
+    maxIterations: agentConfig.maxIterations,
+  };
 
-// 连接 MCP 服务器
-async function connectMCPServers() {
-  if (agentConfig.mcpServers) {
-    for (const mcp of agentConfig.mcpServers) {
-      console.log(chalk.gray(`🔌 连接 MCP: ${mcp.name}...`));
-      const server = await connectMCP(mcp.name, mcp.command, mcp.args);
-      if (server) {
-        console.log(chalk.green(`   ✅ ${mcp.name}: ${server.tools.length} 工具`));
-      } else {
-        console.log(chalk.red(`   ❌ ${mcp.name} 连接失败`));
+  // 连接 MCP 服务器
+  async function connectMCPServers() {
+    if (agentConfig.mcpServers) {
+      for (const mcp of agentConfig.mcpServers) {
+        console.log(chalk.gray(`🔌 连接 MCP: ${mcp.name}...`));
+        const server = await connectMCP(mcp.name, mcp.command, mcp.args);
+        if (server) {
+          console.log(chalk.green(`   ✅ ${mcp.name}: ${server.tools.length} 工具`));
+        } else {
+          console.log(chalk.red(`   ❌ ${mcp.name} 连接失败`));
+        }
       }
     }
   }
-}
 
-async function main() {
   await connectMCPServers();
 
   if (opts.interactive) {
@@ -119,6 +207,4 @@ async function main() {
       process.exit(1);
     });
   }
-}
-
-main();
+})();
