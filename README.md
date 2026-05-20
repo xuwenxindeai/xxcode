@@ -1,22 +1,48 @@
-# 🤖 Coding Agent
+# xxcode 🤖
 
-从零手写的 AI 编程 Agent，支持 81+ 工具、多轮对话、代码沙箱、插件系统。
+> 一个从零手写的 AI 编程 CLI 工具，81+ 工具、TUI 仪表盘、插件系统，全部原生 TypeScript。
+
+![Version](https://img.shields.io/badge/version-1.9.0-blue)
+![Tools](https://img.shields.io/badge/tools-81%2B-green)
+![Language](https://img.shields.io/badge/language-TypeScript-3178c6)
+![License](https://img.shields.io/badge/license-ISC-orange)
+
+---
+
+## 一句话介绍
+
+**用自然语言写代码。** 告诉 xxcode 你想做什么，它自己读文件、改代码、跑测试、提交 Git。
+
+## 能力一览
+
+| 能力 | 说明 |
+|------|------|
+| 🧠 **多轮对话** | 记住上下文，支持子任务、跨任务追问 |
+| 🛠️ **81+ 工具** | 文件操作、Shell、Git、Docker、浏览器、视觉、LSP/AST |
+| 🎨 **TUI 仪表盘** | 终端内实时展示状态：轮数、工具调用、Token 消耗、输出流 |
+| 📦 **插件系统** | npm 安装、Git 克隆、热重载，扩展无上限 |
+| 🔒 **沙箱隔离** | Docker `--read-only` + `--network none` 安全执行 |
+| 🔑 **命令审批** | 危险操作自动拦截，确认后才执行 |
+| 🖼️ **视觉理解** | 截图 + 分析，支持 OpenAI 多模态标准 |
+| 📝 **REPL 交互** | 15+ 内置命令：`/plan`、`/history`、`/stats`、`/undo`... |
 
 ## 快速开始
+
+### 1. 克隆
+
+```bash
+git clone https://github.com/xuwenxindeai/xxcode.git
+cd xxcode
+```
+
+### 2. 安装依赖
 
 ```bash
 npm install
 npm run build
-./dist/index.js "创建一个 Express TODO REST API"
 ```
 
-或使用 REPL 模式交互：
-
-```bash
-./dist/index.js --repl
-```
-
-## 环境变量
+### 3. 配置 API Key
 
 ```bash
 # 阿里云百炼 DashScope
@@ -25,117 +51,83 @@ export DASHSCOPE_BASE_URL="https://coding.dashscope.aliyuncs.com/v1"
 export DASHSCOPE_MODEL="qwen3.5-plus"
 ```
 
-## REPL 命令
+### 4. 运行
 
-| 命令 | 说明 |
-|------|------|
-| `/quit` | 退出 |
-| `/reset` | 重置 Agent（新建实例） |
-| `/clear` | 清空消息历史（保留 system prompt） |
-| `/history` | 查看工具调用历史 |
-| `/stats` | 显示对话统计（消息数/Token/工具调用） |
-| `/tools` | 列出所有可用工具 |
-| `/continue` | 继续上次对话（多轮上下文已自动保持） |
-| `/context` | 显示对话上下文状态 |
-| `/sandbox` | 代码沙箱状态 |
-| `/plugins` | 插件列表 |
-| `/plan` | 为任务生成执行计划 |
-| `/sessions` | 历史会话列表 |
-| `/config` | 当前配置 |
-| `/saveconfig` | 保存配置到文件 |
-| `/test` | 手动运行测试 |
-| `/git` | Git 状态 |
-| `/undo` / `/redo` | 撤销/重做文件修改 |
-| `/memory` | 项目记忆 |
-| `/help` | 帮助 |
+```bash
+# 一次性任务
+./dist/index.js "创建一个 Express TODO REST API"
 
-## 工具清单（81 个）
+# 交互模式（推荐）
+./dist/index.js --repl
+```
 
-### 文件操作
-`read_file` `write_file` `edit_file` `append_file` `peek_file` `search_files` `list_dir` `project_tree` `grep` `find_symbol`
+## 效果预览
 
-### Shell/系统
-`shell` `sys_info` `disk_usage` `memory_usage` `process_list` `network_info` `env_manager` `chmod`
+```
+╔══════════════════════════════════════════════════╗
+║  ✨ xxcode v1.9.0                                ║
+║  🧠 qwen3.5-plus                                 ║
+╚══════════════════════════════════════════════════╝
 
-### 开发工具
-`python` `pip` `npm` `test` `lint` `format` `regex` `detect_encoding` `analyze_image` `screenshot`
+  📋 任务: 创建一个 Express TODO REST API
+  📂 目录: /Users/xwx/projects/todo-api
+  ⚙️  状态: 分析中... [████████░░░░] 67%
 
-### Git
-`git_status` `git_diff` `git_commit` `git_branch` `git_merge`
+  ┌─ Agent 输出 ───────────────────────────────────┐
+  │ 📖 读取 package.json...                        │
+  │ 📝 创建 src/app.ts...                          │
+  │ ✅ 安装依赖 express                            │
+  │ 🧪 运行测试... 通过                            │
+  │ 💾 Git 提交完成                                 │
+  └────────────────────────────────────────────────┘
+```
 
-### 浏览器/Web
-`browser` `fetch_page` `git_branch_tool` `chmod_tool`
+## 技术栈
 
-### Docker
-`docker_run` `docker_exec` `docker_logs` `docker_build` `docker_ps` `docker_stop`
-
-### 视觉理解
-`vision` `take_screenshot` `screenshot_analyze`
-
-### 架构/Review
-`plan` `review_code` `security_scan` `ast_analysis`
-
-### LSP/AST
-`lsp_symbol` `lsp_references` `lsp_definition` `ast_parse`
-
-### 会话/项目
-`session_list` `session_load` `session_create` `project_tree`
-
-### Diff/Undo
-`undo` `redo` `diff_show`
-
-### 工具类
-`path_resolve` `path_exists` `path_info` `file_type` `hash_file` `timestamp`
-
-### Web 搜索
-`web_search` `web_fetch` `web_extract`
+- **TypeScript** — 严格模式，零隐式 any
+- **OpenAI SDK** — 兼容 DashScope / OpenAI 等 LLM 提供商
+- **chalk + readline** — 零依赖 TUI，纯 ANSI 转义序列
+- **child_process** — Shell 执行 + Docker 沙箱
+- **fs + glob** — 文件系统 + 文件搜索
 
 ## 架构
 
 ```
-src/
-├── agent.ts          # 主 Agent + REPL 交互
-├── llm.ts            # LLM 客户端（DashScope 兼容）
-├── types.ts          # 类型定义
-├── context.ts        # 消息压缩/Token 计数
-├── conversation.ts   # 多轮对话上下文管理
-├── sandbox.ts        # 代码沙箱
-├── plugin-system.ts  # 插件系统
-├── plan.ts           # 任务计划生成
-├── session.ts        # 会话管理
-├── memory.ts         # 项目记忆
-├── hooks.ts          # 钩子系统
-├── approval.ts       # 命令审批
-├── test-runner.ts    # 测试运行器
-├── config.ts         # 配置
-├── tui.ts            # 终端 UI 工具
-└── tools/            # 81 个工具实现
-    ├── file.ts       # 文件操作
-    ├── shell.ts      # Shell 命令
-    ├── sysops.ts     # 系统运维
-    ├── devtools.ts   # 开发工具
-    ├── browser.ts    # 浏览器自动化
-    ├── docker.ts     # Docker 操作
-    ├── vision.ts     # 视觉分析
-    ├── git.ts        # Git 操作
-    ├── review.ts     # 代码 Review
-    └── ...
+xxcode/
+├── src/
+│   ├── agent.ts          # Agent 核心 + REPL 主循环
+│   ├── llm.ts            # LLM 客户端（OpenAI 兼容）
+│   ├── types.ts          # 类型定义
+│   ├── context.ts        # Token 计数 + 消息压缩
+│   ├── tui.ts            # 终端 UI 仪表盘
+│   ├── sandbox.ts        # Docker 沙箱隔离
+│   ├── plugin-system.ts  # 插件管理器
+│   ├── tools/            # 81 个工具实现
+│   └── ...
+├── DEVELOP.md            # 开发文档（工具清单 / REPL 命令 / 版本历史）
+└── README.md             # 项目介绍
 ```
 
-## 版本历史
+## 插件系统
 
-| 版本 | 内容 |
-|------|------|
-| 1.0 | 基础文件读写 + Shell |
-| 1.1 | 编辑操作 + 搜索 |
-| 1.2 | Git + Docker + 浏览器 |
-| 1.3 | 测试 + Lint + Review |
-| 1.4 | 子 Agent + 会话管理 |
-| 1.5 | 钩子系统 + 项目记忆 + LSP/AST |
-| **1.7** | **多轮对话 + REPL 命令 + 视觉分析 + 沙箱 + 插件系统** |
-| **1.8** | **完整 TUI 多面板仪表盘 + 实时状态渲染** |
-| **1.9** | **插件工具注册 + Git 安装源 + 长命令心跳 + Resize 适配 + 配置持久化** |
+xxcode 支持第三方插件扩展能力：
+
+```bash
+# 交互模式中
+> /plugins
+> /plugin install my-xxcode-plugin
+
+# 从 npm 安装
+npm install xxcode-plugin-xxx
+
+# 从 Git 安装
+> /plugin install https://github.com/xxx/xxcode-plugin
+```
 
 ## License
 
 ISC
+
+---
+
+**开发文档**：详见 [DEVELOP.md](./DEVELOP.md)（完整工具清单 / REPL 命令 / 架构细节 / 版本历史）
