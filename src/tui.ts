@@ -1,5 +1,8 @@
 import chalk from 'chalk';
 
+// 版本号统一从 package.json 读取，避免各处硬编码脱节
+export const VERSION: string = require('../package.json').version;
+
 // 终端宽度
 function getTerminalWidth(): number {
   return process.stdout.columns || 80;
@@ -49,7 +52,7 @@ export function renderTopBar(state: {
 }): void {
   const w = state.width || getTerminalWidth();
   const bar = [
-    chalk.cyan.bold('🤖 Coding Agent v1.7'),
+    chalk.cyan.bold(`🤖 Coding Agent v${VERSION}`),
     chalk.yellow(`🔄 第 ${state.round} 轮`),
     chalk.green(`🔧 ${state.toolCalls} 次调用`),
     chalk.magenta(`📊 ~${state.tokens >= 1000 ? (state.tokens / 1000).toFixed(1) + 'K' : state.tokens} tokens`),

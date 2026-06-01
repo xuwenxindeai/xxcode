@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { Agent, REPLAgent } from './agent';
+import { VERSION } from './tui';
 import { loadConfig } from './config';
 import { connectMCP } from './mcp';
 import { ConfigWizard } from './wizard';
@@ -14,8 +15,8 @@ const program = new Command();
 
 program
   .name('xxcode')
-  .description('AI 编程 Agent — 从零手写，81+ 工具，TUI 仪表盘，插件系统')
-  .version('1.9.0');
+  .description('AI 编程 Agent — 从零手写，73 个工具，TUI 仪表盘，插件系统')
+  .version(VERSION);
 
 program
   .option('-t, --task <string>', '编程任务描述')

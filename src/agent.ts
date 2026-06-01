@@ -17,7 +17,7 @@ import { createSession, updateSession, listSessions, formatSessionList, getSessi
 import { ContextManager } from './conversation';
 import { CodeSandbox } from './sandbox';
 import { PluginManager } from './plugin-system';
-import { renderDashboard, renderStartupBanner, DashboardState, handleTerminalResize, cleanupResizeListener } from './tui';
+import { renderDashboard, renderStartupBanner, DashboardState, handleTerminalResize, cleanupResizeListener, VERSION } from './tui';
 
 // 工具清单从实际注册的 tools 自动生成，避免与真实工具名脱节
 const TOOL_CATALOG = tools.map(t => `- **${t.name}** — ${t.description}`).join('\n');
@@ -848,9 +848,7 @@ export class REPLAgent {
   }
 
   async start() {
-    console.log(chalk.bold.cyan('\n╔══════════════════════════════════════╗'));
-    console.log(chalk.bold.cyan('║     🤖  Coding Agent REPL v1.6     ║'));
-    console.log(chalk.bold.cyan('╚══════════════════════════════════════╝'));
+    console.log(chalk.bold.cyan(`\n  🤖 Coding Agent REPL ${chalk.dim('v' + VERSION)}`));
     console.log(chalk.gray('   输入任务描述，输入 /quit 退出\n'));
     console.log(chalk.gray('   命令: /quit /reset /clear /history /stats /tools /continue /plan /sessions /config /test /git /undo /redo /memory /context /sandbox /plugins'));
 

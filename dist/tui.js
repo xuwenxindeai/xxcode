@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.VERSION = void 0;
 exports.renderBorder = renderBorder;
 exports.renderTopBar = renderTopBar;
 exports.renderInfoPanel = renderInfoPanel;
@@ -16,6 +17,8 @@ exports.renderStartupBanner = renderStartupBanner;
 exports.handleTerminalResize = handleTerminalResize;
 exports.cleanupResizeListener = cleanupResizeListener;
 const chalk_1 = __importDefault(require("chalk"));
+// 版本号统一从 package.json 读取，避免各处硬编码脱节
+exports.VERSION = require('../package.json').version;
 // 终端宽度
 function getTerminalWidth() {
     return process.stdout.columns || 80;
@@ -52,7 +55,7 @@ function renderBorder(title, width, height, x, y) {
 function renderTopBar(state) {
     const w = state.width || getTerminalWidth();
     const bar = [
-        chalk_1.default.cyan.bold('🤖 Coding Agent v1.7'),
+        chalk_1.default.cyan.bold(`🤖 Coding Agent v${exports.VERSION}`),
         chalk_1.default.yellow(`🔄 第 ${state.round} 轮`),
         chalk_1.default.green(`🔧 ${state.toolCalls} 次调用`),
         chalk_1.default.magenta(`📊 ~${state.tokens >= 1000 ? (state.tokens / 1000).toFixed(1) + 'K' : state.tokens} tokens`),

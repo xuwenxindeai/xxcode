@@ -1,9 +1,9 @@
 # xxcode 🤖
 
-> 一个从零手写的 AI 编程 CLI 工具，81+ 工具、TUI 仪表盘、插件系统，全部原生 TypeScript。
+> 一个从零手写的 AI 编程 CLI 工具，73 个工具、TUI 仪表盘、插件系统，全部原生 TypeScript。
 
 ![Version](https://img.shields.io/badge/version-1.9.0-blue)
-![Tools](https://img.shields.io/badge/tools-81%2B-green)
+![Tools](https://img.shields.io/badge/tools-73-green)
 ![Language](https://img.shields.io/badge/language-TypeScript-3178c6)
 ![License](https://img.shields.io/badge/license-ISC-orange)
 
@@ -61,10 +61,10 @@ export DASHSCOPE_MODEL="qwen3.5-plus"
 | 能力 | 说明 |
 |------|------|
 | 🧠 **多轮对话** | 记住上下文，支持子任务、跨任务追问 |
-| 🛠️ **81+ 工具** | 文件操作、Shell、Git、Docker、浏览器、视觉、LSP/AST |
+| 🛠️ **73 个工具** | 文件操作、Shell、Git、Docker、浏览器、视觉、LSP/AST |
 | 🎨 **TUI 仪表盘** | 终端内实时展示状态：轮数、工具调用、Token 消耗、输出流 |
 | 📦 **插件系统** | npm 安装、Git 克隆、热重载，扩展无上限 |
-| 🔒 **沙箱隔离** | Docker `--read-only` + `--network none` 安全执行 |
+| 🔒 **沙箱(实验性)** | 内置 Docker 沙箱模块，默认 `run_shell` 在本机直接执行 |
 | 🔑 **命令审批** | 危险操作自动拦截，确认后才执行 |
 | 🖼️ **视觉理解** | 截图 + 分析，支持 OpenAI 多模态标准 |
 | 📝 **REPL 交互** | 15+ 内置命令：`/plan`、`/history`、`/stats`、`/undo`... |

@@ -1,3 +1,4 @@
+export declare const VERSION: string;
 export declare function renderBorder(title: string, width: number, height: number, x: number, y: number): void;
 export declare function renderTopBar(state: {
     round: number;

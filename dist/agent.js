@@ -768,9 +768,7 @@ class REPLAgent {
         });
     }
     async start() {
-        console.log(chalk_1.default.bold.cyan('\n╔══════════════════════════════════════╗'));
-        console.log(chalk_1.default.bold.cyan('║     🤖  Coding Agent REPL v1.6     ║'));
-        console.log(chalk_1.default.bold.cyan('╚══════════════════════════════════════╝'));
+        console.log(chalk_1.default.bold.cyan(`\n  🤖 Coding Agent REPL ${chalk_1.default.dim('v' + tui_1.VERSION)}`));
         console.log(chalk_1.default.gray('   输入任务描述，输入 /quit 退出\n'));
         console.log(chalk_1.default.gray('   命令: /quit /reset /clear /history /stats /tools /continue /plan /sessions /config /test /git /undo /redo /memory /context /sandbox /plugins'));
         const ask = () => {

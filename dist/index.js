@@ -40,6 +40,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const commander_1 = require("commander");
 const chalk_1 = __importDefault(require("chalk"));
 const agent_1 = require("./agent");
+const tui_1 = require("./tui");
 const config_1 = require("./config");
 const mcp_1 = require("./mcp");
 const wizard_1 = require("./wizard");
@@ -50,8 +51,8 @@ const readline_1 = __importDefault(require("readline"));
 const program = new commander_1.Command();
 program
     .name('xxcode')
-    .description('AI 编程 Agent — 从零手写，81+ 工具，TUI 仪表盘，插件系统')
-    .version('1.9.0');
+    .description('AI 编程 Agent — 从零手写，73 个工具，TUI 仪表盘，插件系统')
+    .version(tui_1.VERSION);
 program
     .option('-t, --task <string>', '编程任务描述')
     .option('-i, --interactive', '交互模式 (REPL)')
