@@ -56,38 +56,17 @@ const conversation_1 = require("./conversation");
 const sandbox_1 = require("./sandbox");
 const plugin_system_1 = require("./plugin-system");
 const tui_1 = require("./tui");
-const DEFAULT_SYSTEM = `你是一个专业的 AI 编程助手。你有以下工具：
+// 工具清单从实际注册的 tools 自动生成，避免与真实工具名脱节
+const TOOL_CATALOG = tools_1.tools.map(t => `- **${t.name}** — ${t.description}`).join('\n');
+const DEFAULT_SYSTEM = `你是一个专业的 AI 编程助手。你可以使用以下工具：
 
-1. **read_file** - 读取文件内容
-2. **write_file** - 写入文件（创建或覆盖，自动保存快照）
-3. **edit_file** - 精准替换文件中的文本块（自动保存快照）
-4. **append_file** - 追加到文件末尾（自动保存快照）
-5. **peek_file** - 快速读取文件前 N 行
-6. **search_files** - 按 glob 模式搜索文件
-7. **list_dir** - 列出目录
-8. **project_tree** - 打印项目文件树（自动忽略 node_modules/dist）
-9. **grep** - ripgrep 全文搜索
-10. **find_symbol** - 查找符号定义
-11. **run_shell** - 执行 Shell 命令（危险命令需要审批）
-12. **git_status** - 查看 Git 状态
-13. **git_diff** - 查看文件差异
-14. **git_commit** - 提交所有更改
-15. **git_log** - 查看提交记录
-16. **get_dependencies** - 分析文件的 import/require 依赖
-17. **list_symbols** - 列出文件中定义的函数/类/变量（AST 级）
-18. **call_graph** - 分析函数调用关系
-19. **undo** - 撤销上一次文件修改
-20. **redo** - 重做上一次撤销
-21. **undo_history** - 查看撤销/重做历史
-22. **apply_diff** - 使用 unified diff 格式精确修改文件
-23. **generate_diff** - 生成文件差异对比
-24. **list_sessions** - 列出所有已保存的会话
+${TOOL_CATALOG}
 
 规则：
 - 先用 project_tree 或 list_dir 了解项目结构
 - 改代码优先用 edit_file 或 apply_diff
 - 危险命令（rm/sudo/drop 等）会被拦截
-- 写完后用 shell 命令验证
+- 写完后用 run_shell 命令验证
 - 任务完成时总结做了什么
 - 用中文回复`;
 // Spinner
@@ -251,12 +230,16 @@ class SubAgent {
                     const toolName = tc.function.name;
                     console.log(chalk_1.default.magenta(`  │  🔧 ${toolName}(${JSON.stringify(fn).slice(0, 60)})`));
                     const tool = (0, tools_1.getTool)(toolName);
-                    if (!tool)
+                    if (!tool) {
+                        this.messages.push({ role: 'tool', content: `错误：未知工具 "${toolName}"，该工具不存在。`, tool_call_id: tc.id, name: toolName });
                         continue;
+                    }
                     const key = `${toolName}:${JSON.stringify(fn)}`;
                     const count = this.toolCallHistory.get(key) || 0;
-                    if (count >= 2)
+                    if (count >= 2) {
+                        this.messages.push({ role: 'tool', content: `提示：相同调用已执行 ${count} 次，已跳过以避免重复。`, tool_call_id: tc.id, name: toolName });
                         continue;
+                    }
                     this.toolCallHistory.set(key, count + 1);
                     this.totalToolCalls++;
                     const result = await tool.execute(fn, this.config.cwd);
@@ -367,27 +350,10 @@ class Agent {
     async reloadPluginTools() {
         if (!this.pluginManager)
             return;
-        // 清除旧插件工具
+        // 清除旧插件工具：只移除确实由插件注册的工具（按名字精确匹配），绝不误删内置工具
         const pluginToolNames = new Set(this.pluginManager.getPluginTools().map(t => t.name));
-        const staticToolNames = new Set([
-            'read', 'write', 'edit_file', 'append_file', 'peek', 'search_files', 'list_dir', 'tree',
-            'grep', 'find_symbol', 'shell', 'git_status', 'git_diff', 'git_commit', 'git_log',
-            'dependencies', 'symbols', 'call_graph', 'undo', 'redo', 'undo_history',
-            'apply_diff', 'generate_diff', 'session', 'list_sessions', 'delete_session',
-            'web_search', 'web_fetch', 'lsp_hover', 'lsp_definition', 'lsp_references', 'lsp_diagnostics',
-            'docker_ps', 'docker_logs', 'docker_exec', 'docker_compose',
-            'sqlite_query', 'sqlite_tables', 'sqlite_schema',
-            'format', 'read_image', 'notify', 'mcp_status',
-            'code_review', 'batch_review',
-            'env', 'http_server', 'archive', 'ssh', 'config',
-            'ps', 'kill', 'ping', 'port_check', 'curl', 'log', 'perf',
-            'python_repl', 'pip', 'npm', 'screenshot', 'regex', 'detect_encoding', 'env_manager',
-            'browser', 'fetch_page', 'git_branch', 'git_merge', 'chmod',
-            'take_screenshot', 'vision', 'screenshot_analyze', 'analyze_image',
-        ]);
-        // 只清除不在静态列表中的（即插件工具）
         for (let i = tools_1.tools.length - 1; i >= 0; i--) {
-            if (!staticToolNames.has(tools_1.tools[i].name)) {
+            if (pluginToolNames.has(tools_1.tools[i].name)) {
                 tools_1.tools.splice(i, 1);
             }
         }
@@ -481,12 +447,24 @@ class Agent {
                     const tool = (0, tools_1.getTool)(toolName);
                     if (!tool) {
                         console.log(chalk_1.default.red(`  ❌ 未知工具: ${toolName}`));
+                        this.messages.push({
+                            role: 'tool',
+                            content: `错误：未知工具 "${toolName}"，该工具不存在。请从可用工具列表中选择。`,
+                            tool_call_id: tc.id,
+                            name: toolName,
+                        });
                         continue;
                     }
                     const key = `${toolName}:${JSON.stringify(fn)}`;
                     const count = this.toolCallHistory.get(key) || 0;
                     if (count >= 3) {
                         console.log(chalk_1.default.yellow(`  ⚠️  同一调用已执行 ${count} 次，跳过`));
+                        this.messages.push({
+                            role: 'tool',
+                            content: `提示：相同的调用 ${toolName} 已执行 ${count} 次，已跳过以避免死循环。请换一种方式，或总结并结束任务。`,
+                            tool_call_id: tc.id,
+                            name: toolName,
+                        });
                         continue;
                     }
                     this.toolCallHistory.set(key, count + 1);
@@ -980,23 +958,10 @@ class REPLAgent {
                 continue;
             }
             if (trimmed === '/tools') {
-                const toolNames = [
-                    'read_file', 'write_file', 'edit_file', 'append_file', 'peek_file',
-                    'search_files', 'list_dir', 'project_tree', 'grep', 'find_symbol',
-                    'shell', 'python', 'pip', 'npm', 'browser', 'fetch_page',
-                    'git_status', 'git_diff', 'git_commit', 'git_branch', 'git_merge',
-                    'docker_run', 'docker_exec', 'docker_logs',
-                    'vision', 'take_screenshot', 'screenshot_analyze', 'analyze_image',
-                    'plan', 'test', 'lint', 'format', 'undo', 'redo',
-                    'sys_info', 'disk_usage', 'memory_usage', 'process_list',
-                    'review_code', 'security_scan', 'chmod', 'chmod_tool',
-                ];
-                console.log(chalk_1.default.cyan(`🔧 可用工具 (${toolNames.length}):`));
-                for (const name of toolNames.sort()) {
-                    const t = (0, tools_1.getTool)(name);
-                    if (t) {
-                        console.log(chalk_1.default.gray(`  ${name.padEnd(25)} ${t.description.slice(0, 50)}`));
-                    }
+                const sorted = [...tools_1.tools].sort((a, b) => a.name.localeCompare(b.name));
+                console.log(chalk_1.default.cyan(`🔧 可用工具 (${sorted.length}):`));
+                for (const t of sorted) {
+                    console.log(chalk_1.default.gray(`  ${t.name.padEnd(25)} ${t.description.slice(0, 50)}`));
                 }
                 continue;
             }

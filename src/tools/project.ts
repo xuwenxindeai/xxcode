@@ -16,7 +16,7 @@ export const treeTool: Tool = {
   },
   async execute(args, cwd): Promise<ToolResult> {
     try {
-      const rootDir = args.dir === '.' ? cwd : path.resolve(cwd, args.dir);
+      const rootDir = (!args.dir || args.dir === '.') ? cwd : path.resolve(cwd, args.dir);
       if (!fs.existsSync(rootDir)) {
         return { success: false, output: '', error: `目录不存在: ${rootDir}` };
       }

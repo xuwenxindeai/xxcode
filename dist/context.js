@@ -37,7 +37,6 @@ function countMessageTokens(msg) {
  */
 function compressMessages(messages, maxTokens = 80000) {
     const systemMessages = messages.filter(m => m.role === 'system');
-    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
     // 从后往前保留最近的对话
     const compressed = [...systemMessages];
     let usedTokens = compressed.reduce((sum, m) => sum + countMessageTokens(m), 0);
@@ -53,7 +52,12 @@ function compressMessages(messages, maxTokens = 80000) {
         usedTokens += msgTokens;
     }
     // 确保 system prompt 在最前
-    return systemMessages.concat(compressed.filter(m => m.role !== 'system'));
+    const recent = compressed.filter(m => m.role !== 'system');
+    // 保持 tool_call 配对：丢弃开头悬空的 tool 消息（其对应的 assistant.tool_calls 已被截断），
+    // 否则下一次请求会因 "tool 消息缺少对应 tool_calls" 被 API 拒绝（HTTP 400）
+    while (recent.length > 0 && recent[0].role === 'tool')
+        recent.shift();
+    return systemMessages.concat(recent);
 }
 /**
  * 截断过长工具输出
