@@ -41,6 +41,7 @@ const commander_1 = require("commander");
 const chalk_1 = __importDefault(require("chalk"));
 const agent_1 = require("./agent");
 const tui_1 = require("./tui");
+const logger_1 = require("./logger");
 const config_1 = require("./config");
 const mcp_1 = require("./mcp");
 const wizard_1 = require("./wizard");
@@ -227,7 +228,10 @@ if (!apiKey) {
     else if (opts.task) {
         const agent = new agent_1.Agent(config, agentConfig);
         agent.run(opts.task).catch(err => {
+            const logged = (0, logger_1.logError)(err, '一次性任务');
             console.error(chalk_1.default.red('💥 Agent 执行失败:'), err.message);
+            if (logged)
+                console.error(chalk_1.default.gray(`   详细日志: ${logged}`));
             process.exit(1);
         });
     }

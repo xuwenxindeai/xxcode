@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { Agent, REPLAgent } from './agent';
 import { VERSION } from './tui';
+import { logError } from './logger';
 import { loadConfig } from './config';
 import { connectMCP } from './mcp';
 import { ConfigWizard } from './wizard';
@@ -204,7 +205,9 @@ if (!apiKey) {
   } else if (opts.task) {
     const agent = new Agent(config, agentConfig);
     agent.run(opts.task).catch(err => {
+      const logged = logError(err, '一次性任务');
       console.error(chalk.red('💥 Agent 执行失败:'), err.message);
+      if (logged) console.error(chalk.gray(`   详细日志: ${logged}`));
       process.exit(1);
     });
   }

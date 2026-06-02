@@ -42,6 +42,7 @@ const readline_1 = __importDefault(require("readline"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const types_1 = require("./types");
+const logger_1 = require("./logger");
 const llm = __importStar(require("./llm"));
 const tools_1 = require("./tools");
 const context_1 = require("./context");
@@ -955,7 +956,10 @@ class REPLAgent {
                 await this.agent.run(trimmed);
             }
             catch (err) {
+                const logged = (0, logger_1.logError)(err, 'REPL 任务');
                 console.log(chalk_1.default.red(`\n💥 执行失败: ${err.message}`));
+                if (logged)
+                    console.log(chalk_1.default.gray(`   详细日志: ${logged}`));
             }
         }
     }

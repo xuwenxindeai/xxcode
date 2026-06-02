@@ -42,12 +42,17 @@ async function chat(model, messages, tools) {
 async function chatStreaming(model, messages, tools, onChunk) {
     if (!client)
         throw new Error('LLM client not initialized');
-    // Use .stream() method (OpenAI SDK v4+) for proper async iteration
-    const stream = client.chat.completions.stream({
+    // 用底层流式 create({ stream: true }) 而非高级 .stream() helper：
+    // .stream() 会把 chunk 拼成完整消息并严格校验（要求 chunk 带 role），
+    // 而 DashScope / 通义千问在长对话+大量工具调用时偶发不带 role 的 chunk，
+    // 会触发 "missing role for choice 0" 直接崩溃。
+    // create({ stream: true }) 只原样转发 chunk，由下方手动累积，不依赖 role，更兼容。
+    const stream = await client.chat.completions.create({
         model,
         messages: messages,
         tools,
         tool_choice: 'auto',
+        stream: true,
     });
     let fullContent = '';
     let toolCallsMap = new Map();

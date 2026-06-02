@@ -3,6 +3,7 @@ import readline from 'readline';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgentConfig, Message, messageText } from './types';
+import { logError } from './logger';
 import * as llm from './llm';
 import { getTool, toOpenAIFormat, tools } from './tools';
 import { compressMessages, countTokens, countMessageTokens, truncateToolOutput } from './context';
@@ -1029,7 +1030,9 @@ export class REPLAgent {
       try {
         await this.agent.run(trimmed);
       } catch (err: any) {
+        const logged = logError(err, 'REPL 任务');
         console.log(chalk.red(`\n💥 执行失败: ${err.message}`));
+        if (logged) console.log(chalk.gray(`   详细日志: ${logged}`));
       }
     }
   }
