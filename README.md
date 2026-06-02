@@ -56,6 +56,28 @@ export DASHSCOPE_BASE_URL="https://coding.dashscope.aliyuncs.com/v1"
 export DASHSCOPE_MODEL="qwen3.5-plus"
 ```
 
+## 支持的模型厂商（多 Provider）
+
+xxcode 基于 **Vercel AI SDK**，支持三类 provider，默认 `openai-compatible`：
+
+| Provider | 适用厂商 | 配置 |
+|----------|---------|------|
+| `openai-compatible`（默认） | OpenAI、阿里百炼、DeepSeek、Kimi、智谱 GLM、本地 Ollama/vLLM 等所有 OpenAI 兼容接口 | `baseUrl` + `model` + API Key |
+| `anthropic` | Anthropic Claude | 首次向导选 `4`，或设 `provider: "anthropic"` |
+| `google` | Google Gemini | 首次向导选 `5`，或设 `provider: "google"` |
+
+切换方式（任选其一）：
+
+- **环境变量**：`export XXCODE_PROVIDER=anthropic`
+- **编辑 `~/.xxcode/config.json`**：
+
+```json
+{ "provider": "anthropic", "apiKey": "sk-ant-...", "model": "claude-sonnet-4-5" }
+```
+
+> - 想用 Claude / Gemini 也可走 **OpenRouter** 等聚合网关：provider 保持默认 `openai-compatible`，`baseUrl` 指向网关即可。
+> - 模型必须支持 **function calling（工具调用）**，xxcode 才能正常工作。
+
 ## 能力一览
 
 | 能力 | 说明 |
