@@ -77,6 +77,42 @@ function renderStatusBar(round: number, tokens: number, toolsUsed: number) {
   );
 }
 
+// 把工具参数压成简洁摘要：shell 显示命令、文件类显示路径、否则取前几个 key: val
+function summarizeArgs(fn: Record<string, any>): string {
+  if (!fn || typeof fn !== 'object') return '';
+  if (typeof fn.command === 'string') return chalk.dim('  ' + fn.command);
+  const primary = fn.file_path ?? fn.path ?? fn.pattern ?? fn.dir ?? fn.url;
+  if (typeof primary === 'string') return chalk.dim(`(${primary})`);
+  const keys = Object.keys(fn);
+  if (keys.length === 0) return '';
+  const parts = keys.slice(0, 3).map(k => {
+    let s = typeof fn[k] === 'string' ? fn[k] : JSON.stringify(fn[k]);
+    if (s && s.length > 28) s = s.slice(0, 28) + '…';
+    return `${k}: ${s}`;
+  });
+  return chalk.dim(`(${parts.join(', ')})`);
+}
+
+// 工具调用头：● name 参数摘要
+function printToolHeader(name: string, fn: Record<string, any>): void {
+  console.log(`${chalk.cyan('●')} ${chalk.bold(name)}${summarizeArgs(fn)}`);
+}
+
+// 工具结果折叠块：缩进的 └ 摘要；成功灰、失败红；行数与每行宽度随终端自适应
+function printToolResult(result: { success: boolean; output: string; error?: string }): void {
+  const w = process.stdout.columns || 80;
+  const maxLines = w >= 100 ? 6 : 3;          // 宽终端多显示几行
+  const maxCol = Math.max(20, w - 6);          // 每行截断宽度
+  const body = result.success ? (result.output || '(无输出)') : (result.error || result.output || 'failed');
+  const raw = body.split('\n');
+  const shown = raw.slice(0, maxLines).map(l => (l.length > maxCol ? l.slice(0, maxCol - 1) + '…' : l));
+  const color = result.success ? chalk.gray : chalk.red;
+  const mark = result.success ? chalk.green('└') : chalk.red('└');
+  console.log(`  ${mark} ${color(shown[0] ?? '(无输出)')}`);
+  for (let i = 1; i < shown.length; i++) console.log(`    ${color(shown[i])}`);
+  if (raw.length > maxLines) console.log(chalk.dim(`    … 还有 ${raw.length - maxLines} 行`));
+}
+
 /**
  * 轻量状态容器（路线 A：流式输出，不再全屏绘制）。
  * 保留方法签名以兼容既有调用点；render 等不再做全屏渲染——
@@ -402,8 +438,8 @@ export class Agent {
           const fn = JSON.parse(tc.function.arguments);
           const toolName = tc.function.name;
 
-          console.log(chalk.green(`\n  🔧 ${toolName}(${JSON.stringify(fn).slice(0, 80)})`));
-          this.dashboard?.addRecentTool(toolName);
+          console.log();
+          printToolHeader(toolName, fn);
 
           // 钩子: before
           let hookCtx = await globalHooks.emit('before_tool_execute', {
@@ -461,14 +497,7 @@ export class Agent {
 
           const output = truncateToolOutput(result.output, this.agentConfig.maxToolTokens);
 
-          if (result.success) {
-            const lines = output.split('\n').slice(0, 3);
-            console.log(chalk.gray(`  ✅ ${lines.join('\n  ')}`));
-            this.dashboard?.addOutput(`✅ ${toolName}: ${lines[0]}`);
-          } else {
-            console.log(chalk.red(`  ❌ ${result.error || output}`));
-            this.dashboard?.addOutput(`❌ ${toolName}: ${result.error || 'failed'}`);
-          }
+          printToolResult({ success: result.success, output, error: result.error });
 
           this.messages.push({
             role: 'tool',
