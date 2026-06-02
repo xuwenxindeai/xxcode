@@ -17,7 +17,7 @@ import { createSession, updateSession, listSessions, formatSessionList, getSessi
 import { ContextManager } from './conversation';
 import { CodeSandbox } from './sandbox';
 import { PluginManager } from './plugin-system';
-import { renderDashboard, renderStartupBanner, DashboardState, handleTerminalResize, cleanupResizeListener, VERSION } from './tui';
+import { DashboardState, cleanupResizeListener, VERSION } from './tui';
 
 // 工具清单从实际注册的 tools 自动生成，避免与真实工具名脱节
 const TOOL_CATALOG = tools.map(t => `- **${t.name}** — ${t.description}`).join('\n');
@@ -38,13 +38,25 @@ ${TOOL_CATALOG}
 const spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 let spinnerInterval: ReturnType<typeof setInterval> | null = null;
 
+// 是否交互式终端（非 TTY = 管道/重定向/CI：降级为纯文本，不输出 ANSI 动画）
+const isTTY = (): boolean => !!process.stdout.isTTY;
+let spinnerText = '';
+
 function startSpinner(text: string) {
+  spinnerText = text;
+  if (!isTTY()) return; // 非交互终端不输出转圈动画，避免 \r 刷屏
   let i = 0;
-  process.stdout.write(`\r  ${chalk.cyan(spinners[i])} ${text}  `);
+  if (spinnerInterval) clearInterval(spinnerInterval);
+  process.stdout.write(`\r  ${chalk.cyan(spinners[i])} ${spinnerText}  `);
   spinnerInterval = setInterval(() => {
     i = (i + 1) % spinners.length;
-    process.stdout.write(`\r  ${chalk.cyan(spinners[i])} ${text}  `);
+    process.stdout.write(`\r  ${chalk.cyan(spinners[i])} ${spinnerText}  `);
   }, 100);
+}
+
+// 心跳：长命令执行时更新 spinner 文本（如已耗时），不重启动画
+function updateSpinnerText(text: string) {
+  spinnerText = text;
 }
 
 function stopSpinner() {
@@ -52,123 +64,65 @@ function stopSpinner() {
     clearInterval(spinnerInterval);
     spinnerInterval = null;
   }
-  process.stdout.write('\r' + ' '.repeat(60) + '\r');
+  if (isTTY()) process.stdout.write('\r' + ' '.repeat(60) + '\r');
 }
 
 function renderStatusBar(round: number, tokens: number, toolsUsed: number) {
-  const bar = '─'.repeat(60);
-  process.stdout.write(`\n${chalk.gray(bar)}\n`);
+  const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : String(tokens);
   process.stdout.write(
-    `  ${chalk.cyan(`🔄 第 ${round} 轮`)} | ` +
-    `${chalk.yellow(`📊 ~${tokens} tokens`)} | ` +
-    `${chalk.green(`🔧 工具调用: ${toolsUsed}`)}\n`
+    `\n${chalk.gray('───')} ` +
+    `${chalk.cyan(`🔄 第 ${round} 轮`)} ${chalk.gray('·')} ` +
+    `${chalk.yellow(`📊 ~${tk} tokens`)} ${chalk.gray('·')} ` +
+    `${chalk.green(`🔧 工具 ${toolsUsed}`)} ${chalk.gray('─'.repeat(18))}\n`
   );
-  process.stdout.write(`${chalk.gray(bar)}\n`);
 }
 
 /**
- * 完整 TUI 多面板仪表盘
+ * 轻量状态容器（路线 A：流式输出，不再全屏绘制）。
+ * 保留方法签名以兼容既有调用点；render 等不再做全屏渲染——
+ * 状态改由 renderStatusBar 在主循环里逐行输出，与流式 LLM 输出/工具日志顺序衔接，不再互相覆盖。
  */
 class TUIDashboard {
   private cwd: string;
-  private task: string;
-  private model: string;
+  private task = '';
+  private model = '';
   private sessionId?: string;
-  private stats: { round: number; toolCalls: number; tokens: number; lastTool: string };
-  private outputLines: string[] = [];
-  private recentTools: string[] = [];
-  private spinnerText?: string;
-  private startTime: number;
+  private stats = { round: 0, toolCalls: 0, tokens: 0, lastTool: '' };
 
   constructor(cwd: string) {
     this.cwd = cwd;
-    this.task = '';
-    this.model = '';
-    this.stats = { round: 0, toolCalls: 0, tokens: 0, lastTool: '' };
-    this.startTime = Date.now();
   }
 
   init(task: string, model: string, sessionId?: string) {
     this.task = task;
     this.model = model;
     this.sessionId = sessionId;
-    this.startTime = Date.now();
   }
 
   updateStats(stats: Partial<typeof this.stats>) {
     Object.assign(this.stats, stats);
   }
 
-  addOutput(line: string) {
-    this.outputLines.push(line);
-    // 最多保留 200 行
-    if (this.outputLines.length > 200) {
-      this.outputLines = this.outputLines.slice(-200);
-    }
-  }
+  addOutput(_line: string) {}
+  addRecentTool(_name: string) {}
+  setSpinner(_text?: string) {}
+  render(): void {}
+  renderFromState(): void {}
+  clear(): void {}
 
-  addRecentTool(name: string) {
-    this.recentTools.unshift(name);
-    if (this.recentTools.length > 10) {
-      this.recentTools = this.recentTools.slice(0, 10);
-    }
-  }
-
-  setSpinner(text?: string) {
-    this.spinnerText = text;
-  }
-
-  getElapsedTime(): string {
-    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    return mins > 0 ? `${mins}m${secs}s` : `${secs}s`;
-  }
-
-  render(): void {
-    renderDashboard({
-      round: this.stats.round,
-      tokens: this.stats.tokens,
-      toolCalls: this.stats.toolCalls,
-      time: this.getElapsedTime(),
-      task: this.task,
-      cwd: this.cwd,
-      model: this.model,
-      outputLines: this.outputLines,
-      recentTools: this.recentTools,
-      sessionId: this.sessionId,
-      spinnerText: this.spinnerText,
-    });
-  }
-
-  /**
-   * 获取当前状态（用于 resize 重渲染）
-   */
   get state(): DashboardState {
     return {
       round: this.stats.round,
       tokens: this.stats.tokens,
       toolCalls: this.stats.toolCalls,
-      time: this.getElapsedTime(),
+      time: '',
       task: this.task,
       cwd: this.cwd,
       model: this.model,
-      outputLines: this.outputLines,
-      recentTools: this.recentTools,
+      outputLines: [],
+      recentTools: [],
       sessionId: this.sessionId,
-      spinnerText: this.spinnerText,
     };
-  }
-
-  /**
-   * 从状态对象渲染（用于 resize）
-   */
-  renderFromState(state: DashboardState): void {
-    renderDashboard(state);
-  }
-
-  clear(): void {
-    process.stdout.write('\x1B[2J\x1B[H');
   }
 }
 
@@ -324,16 +278,8 @@ export class Agent {
     // 加载并注册插件工具
     this.registerPluginTools();
 
-    // 设置 Shell 心跳处理器（长命令执行时保持 spinner 活跃）
-    setHeartbeatHandler((msg: string) => {
-      if (this.dashboard) {
-        this.dashboard.setSpinner(msg);
-        this.dashboard.render();
-      }
-    });
-
-    // 终端 resize 监听
-    handleTerminalResize(this.dashboard.state, (state) => this.dashboard?.renderFromState(state));
+    // 设置 Shell 心跳处理器（长命令执行时更新 spinner 文本，显示已耗时）
+    setHeartbeatHandler((msg: string) => updateSpinnerText(msg));
   }
 
   /**
@@ -427,15 +373,11 @@ export class Agent {
 
     while (iteration < this.config.maxIterations) {
       iteration++;
-      this.dashboard?.updateStats({ round: iteration, toolCalls: this.totalToolCalls });
-
       const compressed = compressMessages(this.messages, this.agentConfig.maxContextTokens);
       const currentTokens = compressed.reduce((s: number, m: Message) => s + countMessageTokens(m), 0);
-      this.dashboard?.updateStats({ tokens: currentTokens });
 
-      this.dashboard?.setSpinner('思考中...');
-      this.dashboard?.render();
-
+      // 每轮一行紧凑状态（流式，与下面的 LLM 输出/工具日志顺序衔接）
+      renderStatusBar(iteration, currentTokens, this.totalToolCalls);
       startSpinner('思考中...');
 
       const reply = await llm.chatStreaming(
