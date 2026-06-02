@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.tools = void 0;
 exports.getTool = getTool;
 exports.toOpenAIFormat = toOpenAIFormat;
+const define_1 = require("./define");
 const file_1 = require("./file");
 const shell_1 = require("./shell");
 const edit_1 = require("./edit");
@@ -45,7 +46,7 @@ exports.tools = [
     devtools_1.pythonReplTool, devtools_1.pipTool, devtools_1.npmTool, devtools_1.screenshotTool, devtools_1.regexTool, devtools_1.detectEncodingTool, devtools_1.envManagerTool,
     browser_1.browserTool, browser_1.fetchPageTool, browser_1.gitBranchTool, browser_1.gitMergeTool, browser_1.chmodTool,
     vision_1.takeScreenshotTool, vision_1.visionTool, vision_1.screenshotAnalyzeTool, vision_1.analyzeImageTool,
-];
+].map(define_1.withToolSafety);
 function getTool(name) {
     return exports.tools.find(t => t.name === name);
 }

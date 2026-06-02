@@ -1,4 +1,5 @@
 import { Tool } from '../types';
+import { withToolSafety } from './define';
 import { readTool, writeTool, searchFilesTool, listDirTool } from './file';
 import { shellTool } from './shell';
 import { editFileTool, appendFileTool } from './edit';
@@ -42,7 +43,7 @@ export const tools: Tool[] = [
   pythonReplTool, pipTool, npmTool, screenshotTool, regexTool, detectEncodingTool, envManagerTool,
   browserTool, fetchPageTool, gitBranchTool, gitMergeTool, chmodTool,
   takeScreenshotTool, visionTool, screenshotAnalyzeTool, analyzeImageTool,
-];
+].map(withToolSafety);
 
 export function getTool(name: string): Tool | undefined {
   return tools.find(t => t.name === name);
