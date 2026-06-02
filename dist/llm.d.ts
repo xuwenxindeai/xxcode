@@ -1,5 +1,10 @@
 import { Message } from './types';
 export type ProviderKind = 'openai-compatible' | 'anthropic' | 'google';
+export declare function getLastUsage(): {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+};
 /**
  * 初始化 LLM 客户端。
  * provider 决定底层走哪套协议（默认 openai-compatible，兼容 OpenAI/DashScope/DeepSeek/Kimi/本地等）；

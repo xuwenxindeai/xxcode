@@ -9,6 +9,10 @@ export type ProviderKind = 'openai-compatible' | 'anthropic' | 'google';
 // 由 initClient 设置：根据 modelId 返回一个 AI SDK LanguageModel
 let getModel: ((modelId: string) => any) | null = null;
 
+// 最近一次 LLM 调用的真实 usage（部分 provider 如 DashScope 不回传，则字段为 undefined，调用方退回估算）
+let _lastUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } = {};
+export function getLastUsage() { return _lastUsage; }
+
 /**
  * 初始化 LLM 客户端。
  * provider 决定底层走哪套协议（默认 openai-compatible，兼容 OpenAI/DashScope/DeepSeek/Kimi/本地等）；
@@ -143,10 +147,12 @@ export async function chatStreaming(
     } else if (part.type === 'tool-call') {
       const p = part as any;
       toolCalls.push({ toolCallId: p.toolCallId, toolName: p.toolName, input: p.input });
+    } else if (part.type === 'finish') {
+      _lastUsage = (part as any).totalUsage || {};
     } else if (part.type === 'error') {
       throw (part as any).error || new Error('流式响应出错');
     }
-    // reasoning-delta / tool-input-* / start / finish 等忽略
+    // reasoning-delta / tool-input-* / start 等忽略
   }
 
   const msg: Message = { role: 'assistant', content: fullContent };

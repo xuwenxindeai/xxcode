@@ -6,7 +6,7 @@ import { AgentConfig, Message, messageText } from './types';
 import { logError } from './logger';
 import * as llm from './llm';
 import { getTool, toOpenAIFormat, tools } from './tools';
-import { compressMessages, countTokens, countMessageTokens, truncateToolOutput } from './context';
+import { compressMessages, compactMessages, estimateTokens, countTokens, countMessageTokens, truncateToolOutput } from './context';
 import { CodingAgentConfig } from './config';
 import { TestRunner } from './test-runner';
 import { askApproval, isDangerous } from './approval';
@@ -410,8 +410,34 @@ export class Agent {
 
     while (iteration < this.config.maxIterations) {
       iteration++;
+
+      // 自动 compact：上下文超过 80% 阈值时，把较老的对话摘要成一条，避免硬截断导致失忆
+      const compactRes = await compactMessages(
+        this.messages,
+        Math.floor(this.agentConfig.maxContextTokens * 0.8),
+        async (older) => {
+          const transcript = older.map(m => {
+            const t = messageText(m) || '';
+            if (m.role === 'tool') return `[工具结果] ${t.slice(0, 400)}`;
+            if (m.role === 'assistant' && m.tool_calls) return `[助手·调用 ${m.tool_calls.map(tc => tc.function.name).join('/')}] ${t}`;
+            return `[${m.role}] ${t}`;
+          }).join('\n');
+          const r = await llm.chat(this.config.model, [
+            { role: 'system', content: '你是对话历史压缩器。把给定的编程对话历史压成简洁中文要点，保留：任务目标、关键决定、改动过的文件、当前进度与未完成项。不要编造、不要展开。' },
+            { role: 'user', content: `请总结以下历史：\n\n${transcript}` },
+          ]);
+          return messageText(r) || '(无摘要)';
+        },
+      );
+      if (compactRes.compacted) {
+        this.messages = compactRes.messages;
+        console.log(chalk.gray(`  🗜️  上下文已自动压缩：摘要了 ${compactRes.summarizedCount} 条历史消息`));
+      }
+
       const compressed = compressMessages(this.messages, this.agentConfig.maxContextTokens);
-      const currentTokens = compressed.reduce((s: number, m: Message) => s + countMessageTokens(m), 0);
+      // 显示优先用真实 usage（上一轮的输入 token），部分 provider 不回传则退回估算
+      const realInput = llm.getLastUsage().inputTokens;
+      const currentTokens = realInput ?? estimateTokens(compressed);
 
       // 每轮一行紧凑状态（流式，与下面的 LLM 输出/工具日志顺序衔接）
       renderStatusBar(iteration, currentTokens, this.totalToolCalls);
@@ -881,12 +907,18 @@ export class REPLAgent {
         continue;
       }
       if (trimmed === '/context') {
+        const ms = this.agent.getMessageStats();
+        const max = this.agentConfig.maxContextTokens;
+        const realIn = llm.getLastUsage().inputTokens;
+        const used = realIn ?? ms.totalTokens;
+        const pct = Math.min(100, Math.round((used / max) * 100));
+        console.log(chalk.cyan('💬 对话上下文:'));
+        console.log(chalk.gray(`  上下文用量: ~${used} / ${max} tokens (${pct}%)${realIn != null ? ' [真实]' : ' [估算]'}`));
+        console.log(chalk.gray(`  消息数量: ${ms.totalMessages}（user ${ms.userCount} / assistant ${ms.assistantCount} / tool ${ms.toolCount}）`));
         const ctx = this.agent.getConversationContext();
         if (ctx) {
           const stats = ctx.getStats();
-          console.log(chalk.cyan('💬 对话上下文:'));
           console.log(chalk.gray(`  任务计数: ${stats.taskCount}`));
-          console.log(chalk.gray(`  消息数量: ${stats.messageCount}`));
           console.log(chalk.gray(`  最近任务: ${stats.recentWork}`));
           if (stats.openFiles.length > 0) {
             console.log(chalk.gray(`  打开文件: ${stats.openFiles.join(', ')}`));

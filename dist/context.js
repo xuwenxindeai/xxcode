@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.countTokens = countTokens;
 exports.countMessageTokens = countMessageTokens;
 exports.compressMessages = compressMessages;
+exports.estimateTokens = estimateTokens;
+exports.compactMessages = compactMessages;
 exports.truncateToolOutput = truncateToolOutput;
 const types_1 = require("./types");
 function countTokens(text) {
@@ -58,6 +60,31 @@ function compressMessages(messages, maxTokens = 80000) {
     while (recent.length > 0 && recent[0].role === 'tool')
         recent.shift();
     return systemMessages.concat(recent);
+}
+/** 估算整段消息的 token（粗估，用于 compact 阈值判断） */
+function estimateTokens(messages) {
+    return messages.reduce((sum, m) => sum + countMessageTokens(m), 0);
+}
+/**
+ * 自动压缩（compact）：上下文超过 maxTokens 时，把较老的一批对话交给 summarize 生成摘要，
+ * 用一条摘要消息替换它们；保留 system + 最近 keepRecent 条，并维持 tool_call 配对。
+ * 区别于 compressMessages 的"硬截断丢老消息"——这里把老对话摘要保留，避免 Agent 失忆。
+ */
+async function compactMessages(messages, maxTokens, summarize, keepRecent = 6) {
+    if (estimateTokens(messages) <= maxTokens)
+        return { messages, compacted: false, summarizedCount: 0 };
+    const system = messages.filter(m => m.role === 'system');
+    const conv = messages.filter(m => m.role !== 'system');
+    if (conv.length <= keepRecent + 2)
+        return { messages, compacted: false, summarizedCount: 0 };
+    const older = conv.slice(0, conv.length - keepRecent);
+    let recent = conv.slice(conv.length - keepRecent);
+    // 维持配对：recent 开头不能是悬空 tool（其 assistant.tool_calls 已被并入 older 摘要）
+    while (recent.length > 0 && recent[0].role === 'tool')
+        recent.shift();
+    const summary = await summarize(older);
+    const summaryMsg = { role: 'assistant', content: `[之前对话的摘要]\n${summary}` };
+    return { messages: [...system, summaryMsg, ...recent], compacted: true, summarizedCount: older.length };
 }
 /**
  * 截断过长工具输出
