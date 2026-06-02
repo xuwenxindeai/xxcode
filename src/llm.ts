@@ -86,15 +86,24 @@ function aiToolCallsToOpenAI(toolCalls: any[]): Message['tool_calls'] {
   }));
 }
 
+/** 把 system 消息从对话里抽出来：AI SDK 推荐 system 走独立参数（消除 prompt-injection 警告、更安全） */
+export function splitSystem(messages: Message[]): { system?: string; rest: Message[] } {
+  const sys = messages.filter(m => m.role === 'system').map(m => messageText(m)).filter(Boolean);
+  const rest = messages.filter(m => m.role !== 'system');
+  return { system: sys.length ? sys.join('\n\n') : undefined, rest };
+}
+
 // ── 调用 ──────────────────────────────
 
 export async function chat(model: string, messages: Message[], tools?: any[]): Promise<Message> {
   if (!getModel) throw new Error('LLM client not initialized');
   const aiTools = toAITools(tools || []);
   const hasTools = Object.keys(aiTools).length > 0;
+  const { system, rest } = splitSystem(messages);
   const { text, toolCalls } = await generateText({
     model: getModel(model),
-    messages: toModelMessages(messages),
+    ...(system ? { system } : {}),
+    messages: toModelMessages(rest),
     ...(hasTools ? { tools: aiTools, toolChoice: 'auto' as const } : {}),
   });
   const msg: Message = { role: 'assistant', content: text || '' };
@@ -116,9 +125,11 @@ export async function chatStreaming(
   const aiTools = toAITools(tools || []);
   const hasTools = Object.keys(aiTools).length > 0;
 
+  const { system, rest } = splitSystem(messages);
   const result = streamText({
     model: getModel(model),
-    messages: toModelMessages(messages),
+    ...(system ? { system } : {}),
+    messages: toModelMessages(rest),
     ...(hasTools ? { tools: aiTools, toolChoice: 'auto' as const } : {}),
   });
 

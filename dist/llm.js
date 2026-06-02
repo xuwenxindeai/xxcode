@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.initClient = initClient;
 exports.toModelMessages = toModelMessages;
 exports.toAITools = toAITools;
+exports.splitSystem = splitSystem;
 exports.chat = chat;
 exports.chatStreaming = chatStreaming;
 const ai_1 = require("ai");
@@ -95,15 +96,23 @@ function aiToolCallsToOpenAI(toolCalls) {
         function: { name: tc.toolName, arguments: JSON.stringify(tc.input ?? {}) },
     }));
 }
+/** 把 system 消息从对话里抽出来：AI SDK 推荐 system 走独立参数（消除 prompt-injection 警告、更安全） */
+function splitSystem(messages) {
+    const sys = messages.filter(m => m.role === 'system').map(m => (0, types_1.messageText)(m)).filter(Boolean);
+    const rest = messages.filter(m => m.role !== 'system');
+    return { system: sys.length ? sys.join('\n\n') : undefined, rest };
+}
 // ── 调用 ──────────────────────────────
 async function chat(model, messages, tools) {
     if (!getModel)
         throw new Error('LLM client not initialized');
     const aiTools = toAITools(tools || []);
     const hasTools = Object.keys(aiTools).length > 0;
+    const { system, rest } = splitSystem(messages);
     const { text, toolCalls } = await (0, ai_1.generateText)({
         model: getModel(model),
-        messages: toModelMessages(messages),
+        ...(system ? { system } : {}),
+        messages: toModelMessages(rest),
         ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
     });
     const msg = { role: 'assistant', content: text || '' };
@@ -120,9 +129,11 @@ async function chatStreaming(model, messages, tools, onChunk) {
         throw new Error('LLM client not initialized');
     const aiTools = toAITools(tools || []);
     const hasTools = Object.keys(aiTools).length > 0;
+    const { system, rest } = splitSystem(messages);
     const result = (0, ai_1.streamText)({
         model: getModel(model),
-        messages: toModelMessages(messages),
+        ...(system ? { system } : {}),
+        messages: toModelMessages(rest),
         ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
     });
     let fullContent = '';

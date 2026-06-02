@@ -10,6 +10,11 @@ export declare function initClient(apiKey: string, baseURL?: string, provider?: 
 export declare function toModelMessages(messages: Message[]): any[];
 /** xxcode 的 OpenAI 风格 tools → AI SDK 的 tools 映射（不带 execute，由 Agent 主循环执行） */
 export declare function toAITools(openaiTools: any[]): Record<string, any>;
+/** 把 system 消息从对话里抽出来：AI SDK 推荐 system 走独立参数（消除 prompt-injection 警告、更安全） */
+export declare function splitSystem(messages: Message[]): {
+    system?: string;
+    rest: Message[];
+};
 export declare function chat(model: string, messages: Message[], tools?: any[]): Promise<Message>;
 /**
  * 流式调用：边生成边把正文喂给 onChunk（reasoning 思考链忽略，保持原有展示行为）。

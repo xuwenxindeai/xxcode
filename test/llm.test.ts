@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toModelMessages, toAITools } from '../src/llm';
+import { toModelMessages, toAITools, splitSystem } from '../src/llm';
 import type { Message } from '../src/types';
 
 describe('toModelMessages（xxcode Message → AI SDK ModelMessage）', () => {
@@ -43,5 +43,26 @@ describe('toAITools（OpenAI 风格 tools → AI SDK tools 映射）', () => {
 
   it('空数组 → 空对象', () => {
     expect(toAITools([])).toEqual({});
+  });
+});
+
+describe('splitSystem（system 抽成 AI SDK 独立参数，消除注入警告）', () => {
+  it('抽出 system 文本，rest 不含 system', () => {
+    const r = splitSystem([
+      { role: 'system', content: '系统提示' },
+      { role: 'user', content: '你好' },
+      { role: 'assistant', content: '在' },
+    ]);
+    expect(r.system).toBe('系统提示');
+    expect(r.rest.map(m => m.role)).toEqual(['user', 'assistant']);
+  });
+  it('无 system 时为 undefined', () => {
+    const r = splitSystem([{ role: 'user', content: 'hi' }]);
+    expect(r.system).toBeUndefined();
+    expect(r.rest.length).toBe(1);
+  });
+  it('多条 system 合并', () => {
+    const r = splitSystem([{ role: 'system', content: 'a' }, { role: 'system', content: 'b' }, { role: 'user', content: 'x' }]);
+    expect(r.system).toBe('a\n\nb');
   });
 });
