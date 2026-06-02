@@ -2,6 +2,7 @@ export interface CodingAgentConfig {
     model: string;
     apiKey: string;
     baseUrl?: string;
+    provider?: 'openai-compatible' | 'anthropic' | 'google';
     cwd: string;
     maxIterations: number;
     maxToolTokens: number;

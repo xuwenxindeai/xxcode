@@ -6,6 +6,7 @@ export interface CodingAgentConfig {
   model: string;
   apiKey: string;
   baseUrl?: string;
+  provider?: 'openai-compatible' | 'anthropic' | 'google';
 
   // 运行配置
   cwd: string;

@@ -39,6 +39,7 @@ export interface AgentConfig {
   model: string;
   apiKey: string;
   baseURL?: string;
+  provider?: 'openai-compatible' | 'anthropic' | 'google';
   cwd: string;
   maxIterations: number;
   systemPrompt?: string;

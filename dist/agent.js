@@ -208,7 +208,7 @@ class SubAgent {
         ];
         this.toolCallHistory = new Map();
         this.totalToolCalls = 0;
-        llm.initClient(config.apiKey, config.baseURL);
+        llm.initClient(config.apiKey, config.baseURL, config.provider);
         (0, shell_1.setApprovalHandler)(approval_1.askApproval);
     }
     async run(task) {
@@ -306,7 +306,7 @@ class Agent {
             commitPrefix: '🤖 coding-agent: ',
             maxSubAgents: 3,
         };
-        llm.initClient(config.apiKey, config.baseURL);
+        llm.initClient(config.apiKey, config.baseURL, config.provider);
         (0, shell_1.setApprovalHandler)(approval_1.askApproval);
         this.testRunner = new test_runner_1.TestRunner(this.agentConfig.cwd);
         // 初始化上下文管理器

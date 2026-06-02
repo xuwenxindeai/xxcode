@@ -1,105 +1,150 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initClient = initClient;
+exports.toModelMessages = toModelMessages;
+exports.toAITools = toAITools;
 exports.chat = chat;
 exports.chatStreaming = chatStreaming;
-const openai_1 = __importDefault(require("openai"));
-let client = null;
-function initClient(apiKey, baseURL) {
-    client = new openai_1.default({
-        apiKey,
-        baseURL: baseURL || undefined,
+const ai_1 = require("ai");
+const openai_compatible_1 = require("@ai-sdk/openai-compatible");
+const anthropic_1 = require("@ai-sdk/anthropic");
+const google_1 = require("@ai-sdk/google");
+const types_1 = require("./types");
+// 由 initClient 设置：根据 modelId 返回一个 AI SDK LanguageModel
+let getModel = null;
+/**
+ * 初始化 LLM 客户端。
+ * provider 决定底层走哪套协议（默认 openai-compatible，兼容 OpenAI/DashScope/DeepSeek/Kimi/本地等）；
+ * anthropic / google 走各自原生协议。baseURL 仅 openai-compatible 必需（可覆盖 anthropic/google 默认）。
+ */
+function initClient(apiKey, baseURL, provider = 'openai-compatible') {
+    if (provider === 'anthropic') {
+        const p = (0, anthropic_1.createAnthropic)({ apiKey, ...(baseURL ? { baseURL } : {}) });
+        getModel = (id) => p(id);
+    }
+    else if (provider === 'google') {
+        const p = (0, google_1.createGoogleGenerativeAI)({ apiKey, ...(baseURL ? { baseURL } : {}) });
+        getModel = (id) => p(id);
+    }
+    else {
+        const p = (0, openai_compatible_1.createOpenAICompatible)({
+            name: 'xxcode',
+            baseURL: baseURL || 'https://api.openai.com/v1',
+            apiKey,
+        });
+        getModel = (id) => p(id);
+    }
+}
+// ── 格式转换 ──────────────────────────────
+/** xxcode 的 Message[]（OpenAI 风格）→ AI SDK 的 ModelMessage[] */
+function toModelMessages(messages) {
+    return messages.map((m) => {
+        if (m.role === 'system')
+            return { role: 'system', content: (0, types_1.messageText)(m) };
+        if (m.role === 'user')
+            return { role: 'user', content: (0, types_1.messageText)(m) };
+        if (m.role === 'tool') {
+            return {
+                role: 'tool',
+                content: [{
+                        type: 'tool-result',
+                        toolCallId: m.tool_call_id || '',
+                        toolName: m.name || 'tool',
+                        output: { type: 'text', value: (0, types_1.messageText)(m) },
+                    }],
+            };
+        }
+        // assistant：可能同时有文本和 tool_calls
+        const parts = [];
+        const text = (0, types_1.messageText)(m);
+        if (text)
+            parts.push({ type: 'text', text });
+        if (m.tool_calls) {
+            for (const tc of m.tool_calls) {
+                let input = {};
+                try {
+                    input = JSON.parse(tc.function.arguments || '{}');
+                }
+                catch {
+                    input = {};
+                }
+                parts.push({ type: 'tool-call', toolCallId: tc.id, toolName: tc.function.name, input });
+            }
+        }
+        return { role: 'assistant', content: parts.length ? parts : text };
     });
 }
+/** xxcode 的 OpenAI 风格 tools → AI SDK 的 tools 映射（不带 execute，由 Agent 主循环执行） */
+function toAITools(openaiTools) {
+    const out = {};
+    for (const t of openaiTools || []) {
+        const fn = t.function || t;
+        if (!fn || !fn.name)
+            continue;
+        out[fn.name] = (0, ai_1.tool)({
+            description: fn.description || '',
+            inputSchema: (0, ai_1.jsonSchema)(fn.parameters || { type: 'object', properties: {} }),
+        });
+    }
+    return out;
+}
+function aiToolCallsToOpenAI(toolCalls) {
+    return (toolCalls || []).map((tc) => ({
+        id: tc.toolCallId,
+        type: 'function',
+        function: { name: tc.toolName, arguments: JSON.stringify(tc.input ?? {}) },
+    }));
+}
+// ── 调用 ──────────────────────────────
 async function chat(model, messages, tools) {
-    if (!client)
+    if (!getModel)
         throw new Error('LLM client not initialized');
-    const params = {
-        model,
-        messages: messages,
-    };
-    if (tools && tools.length > 0) {
-        params.tools = tools;
-        params.tool_choice = 'auto';
-    }
-    const response = await client.chat.completions.create(params);
-    const choice = response.choices[0];
-    const msg = {
-        role: 'assistant',
-        content: choice.message.content || '',
-    };
-    if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
-        msg.tool_calls = choice.message.tool_calls;
-    }
+    const aiTools = toAITools(tools || []);
+    const hasTools = Object.keys(aiTools).length > 0;
+    const { text, toolCalls } = await (0, ai_1.generateText)({
+        model: getModel(model),
+        messages: toModelMessages(messages),
+        ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
+    });
+    const msg = { role: 'assistant', content: text || '' };
+    if (toolCalls && toolCalls.length > 0)
+        msg.tool_calls = aiToolCallsToOpenAI(toolCalls);
     return msg;
 }
 /**
- * 流式调用 LLM，边生成边输出文本
+ * 流式调用：边生成边把正文喂给 onChunk（reasoning 思考链忽略，保持原有展示行为）。
+ * 用 AI SDK 的 fullStream 手动累积，不依赖 chunk 的 role，天然规避 "missing role" 这类问题。
  */
 async function chatStreaming(model, messages, tools, onChunk) {
-    if (!client)
+    if (!getModel)
         throw new Error('LLM client not initialized');
-    // 用底层流式 create({ stream: true }) 而非高级 .stream() helper：
-    // .stream() 会把 chunk 拼成完整消息并严格校验（要求 chunk 带 role），
-    // 而 DashScope / 通义千问在长对话+大量工具调用时偶发不带 role 的 chunk，
-    // 会触发 "missing role for choice 0" 直接崩溃。
-    // create({ stream: true }) 只原样转发 chunk，由下方手动累积，不依赖 role，更兼容。
-    const stream = await client.chat.completions.create({
-        model,
-        messages: messages,
-        tools,
-        tool_choice: 'auto',
-        stream: true,
+    const aiTools = toAITools(tools || []);
+    const hasTools = Object.keys(aiTools).length > 0;
+    const result = (0, ai_1.streamText)({
+        model: getModel(model),
+        messages: toModelMessages(messages),
+        ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
     });
     let fullContent = '';
-    let toolCallsMap = new Map();
-    for await (const chunk of stream) {
-        const delta = chunk.choices[0]?.delta;
-        if (!delta)
-            continue;
-        // 文本流式输出
-        if (delta.content) {
-            onChunk(delta.content);
-            fullContent += delta.content;
+    const toolCalls = [];
+    for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+            const t = part.text || '';
+            onChunk(t);
+            fullContent += t;
         }
-        // 收集 tool_calls（流式返回是增量片段）
-        if (delta.tool_calls) {
-            for (const tc of delta.tool_calls) {
-                const idx = tc.index ?? 0;
-                if (!toolCallsMap.has(idx)) {
-                    toolCallsMap.set(idx, {
-                        id: tc.id || '',
-                        name: tc.function?.name || '',
-                        args: '',
-                    });
-                }
-                const existing = toolCallsMap.get(idx);
-                if (tc.id)
-                    existing.id = tc.id;
-                if (tc.function?.name)
-                    existing.name = tc.function.name;
-                if (tc.function?.arguments)
-                    existing.args += tc.function.arguments;
-            }
+        else if (part.type === 'tool-call') {
+            const p = part;
+            toolCalls.push({ toolCallId: p.toolCallId, toolName: p.toolName, input: p.input });
         }
+        else if (part.type === 'error') {
+            throw part.error || new Error('流式响应出错');
+        }
+        // reasoning-delta / tool-input-* / start / finish 等忽略
     }
-    const msg = {
-        role: 'assistant',
-        content: fullContent,
-    };
-    if (toolCallsMap.size > 0) {
-        msg.tool_calls = Array.from(toolCallsMap.values()).map(tc => ({
-            id: tc.id,
-            type: 'function',
-            function: {
-                name: tc.name,
-                arguments: tc.args,
-            },
-        }));
-    }
+    const msg = { role: 'assistant', content: fullContent };
+    if (toolCalls.length > 0)
+        msg.tool_calls = aiToolCallsToOpenAI(toolCalls);
     return msg;
 }
 //# sourceMappingURL=llm.js.map

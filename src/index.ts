@@ -44,6 +44,7 @@ interface GlobalConfig {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  provider?: 'openai-compatible' | 'anthropic' | 'google';
   setupComplete?: boolean;
 }
 
@@ -75,9 +76,11 @@ async function firstRunSetup(): Promise<GlobalConfig> {
   console.log(chalk.bold.cyan('\n🚀 欢迎使用 xxcode！首次使用需要配置 API Key\n'));
   console.log(chalk.gray('  1. 阿里云百炼 (DashScope) — 推荐'));
   console.log(chalk.gray('  2. OpenAI'));
-  console.log(chalk.gray('  3. 自定义 OpenAI 兼容接口\n'));
+  console.log(chalk.gray('  3. 自定义 OpenAI 兼容接口'));
+  console.log(chalk.gray('  4. Anthropic Claude'));
+  console.log(chalk.gray('  5. Google Gemini\n'));
 
-  const choice = await prompt('请选择 [1/2/3]: ');
+  const choice = await prompt('请选择 [1/2/3/4/5]: ');
 
   let cfg: GlobalConfig = { setupComplete: true };
 
@@ -86,16 +89,29 @@ async function firstRunSetup(): Promise<GlobalConfig> {
     if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
     cfg.model = await prompt('模型 [qwen3.5-plus]: ') || 'qwen3.5-plus';
     cfg.baseUrl = 'https://coding.dashscope.aliyuncs.com/v1';
+    cfg.provider = 'openai-compatible';
   } else if (choice === '2') {
     cfg.apiKey = await prompt('OpenAI API Key: ');
     if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
     cfg.model = await prompt('模型 [gpt-4o]: ') || 'gpt-4o';
     cfg.baseUrl = 'https://api.openai.com/v1';
+    cfg.provider = 'openai-compatible';
+  } else if (choice === '4') {
+    cfg.apiKey = await prompt('Anthropic API Key: ');
+    if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
+    cfg.model = await prompt('模型 [claude-sonnet-4-5]: ') || 'claude-sonnet-4-5';
+    cfg.provider = 'anthropic';
+  } else if (choice === '5') {
+    cfg.apiKey = await prompt('Google API Key: ');
+    if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
+    cfg.model = await prompt('模型 [gemini-2.5-pro]: ') || 'gemini-2.5-pro';
+    cfg.provider = 'google';
   } else {
     cfg.apiKey = await prompt('API Key: ');
     if (!cfg.apiKey) { console.error(chalk.red('❌ API Key 不能为空')); process.exit(1); }
     cfg.baseUrl = await prompt('Base URL: ');
     cfg.model = await prompt('模型: ');
+    cfg.provider = 'openai-compatible';
   }
 
   return cfg;
@@ -129,6 +145,9 @@ let model = opts.model
   || process.env.DASHSCOPE_MODEL
   || 'gpt-4o';
 
+let provider: 'openai-compatible' | 'anthropic' | 'google' | undefined =
+  (process.env.XXCODE_PROVIDER as any) || undefined;
+
 // 从全局配置读取
 const globalCfg = loadGlobalConfig();
 if (globalCfg.apiKey && !apiKey) {
@@ -136,6 +155,7 @@ if (globalCfg.apiKey && !apiKey) {
   if (globalCfg.baseUrl && !baseUrl) baseUrl = globalCfg.baseUrl;
   if (globalCfg.model && !opts.model) model = globalCfg.model;
 }
+if (globalCfg.provider && !provider) provider = globalCfg.provider;
 
 // 从项目 .env 读取
 if (!apiKey) {
@@ -155,6 +175,7 @@ if (!apiKey) {
     apiKey = cfg.apiKey!;
     baseUrl = cfg.baseUrl || baseUrl;
     model = cfg.model || model;
+    provider = cfg.provider || provider;
     console.log(chalk.green('\n✅ 配置已保存到 ~/.xxcode/config.json'));
     console.log(chalk.gray('   下次启动将自动使用此配置\n'));
   }
@@ -164,6 +185,7 @@ if (!apiKey) {
     model,
     apiKey: apiKey!,
     baseUrl,
+    provider,
     cwd: path.resolve(opts.dir),
     maxIterations: parseInt(opts.maxIter),
     autoTest: opts.autoTest,
@@ -175,6 +197,7 @@ if (!apiKey) {
     model: agentConfig.model,
     apiKey: agentConfig.apiKey,
     baseURL: agentConfig.baseUrl,
+    provider: agentConfig.provider,
     cwd: agentConfig.cwd,
     maxIterations: agentConfig.maxIterations,
   };

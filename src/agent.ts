@@ -182,7 +182,7 @@ export class SubAgent {
     this.toolCallHistory = new Map();
     this.totalToolCalls = 0;
 
-    llm.initClient(config.apiKey, config.baseURL);
+    llm.initClient(config.apiKey, config.baseURL, config.provider);
     setApprovalHandler(askApproval);
   }
 
@@ -299,7 +299,7 @@ export class Agent {
       maxSubAgents: 3,
     };
 
-    llm.initClient(config.apiKey, config.baseURL);
+    llm.initClient(config.apiKey, config.baseURL, config.provider);
     setApprovalHandler(askApproval);
     this.testRunner = new TestRunner(this.agentConfig.cwd);
 
