@@ -10,7 +10,7 @@ export type ProviderKind = 'openai-compatible' | 'anthropic' | 'google';
 let getModel: ((modelId: string) => any) | null = null;
 
 // 最近一次 LLM 调用的真实 usage（部分 provider 如 DashScope 不回传，则字段为 undefined，调用方退回估算）
-let _lastUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } = {};
+let _lastUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedInputTokens?: number; reasoningTokens?: number } = {};
 export function getLastUsage() { return _lastUsage; }
 
 /**

@@ -4,6 +4,8 @@ export declare function getLastUsage(): {
     inputTokens?: number;
     outputTokens?: number;
     totalTokens?: number;
+    cachedInputTokens?: number;
+    reasoningTokens?: number;
 };
 /**
  * 初始化 LLM 客户端。

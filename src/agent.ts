@@ -68,6 +68,10 @@ function stopSpinner() {
   if (isTTY()) process.stdout.write('\r' + ' '.repeat(60) + '\r');
 }
 
+function fmtTok(n: number): string {
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+}
+
 function renderStatusBar(round: number, tokens: number, toolsUsed: number) {
   const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : String(tokens);
   process.stdout.write(
@@ -407,6 +411,7 @@ export class Agent {
     }
 
     let iteration = 0;
+    const sessionUsage = { input: 0, output: 0, cached: 0 };
 
     while (iteration < this.config.maxIterations) {
       iteration++;
@@ -455,6 +460,24 @@ export class Agent {
 
       if (spinnerInterval) stopSpinner();
       this.dashboard?.setSpinner(undefined);
+
+      // 实时 token 用量（每次请求后，Claude Code 风格：本次 ↑输入 ↓输出 + 缓存命中 + 思考 + 累计）
+      const u = llm.getLastUsage();
+      if (typeof u.inputTokens === 'number') {
+        sessionUsage.input += u.inputTokens;
+        sessionUsage.output += u.outputTokens || 0;
+        sessionUsage.cached += u.cachedInputTokens || 0;
+        const cache = u.cachedInputTokens || 0;
+        const reasoning = u.reasoningTokens || 0;
+        console.log(
+          chalk.gray(`  💰 本次 ↑${fmtTok(u.inputTokens)}`) +
+          (cache > 0 ? chalk.green(`(缓存 ${fmtTok(cache)})`) : '') +
+          chalk.gray(` ↓${fmtTok(u.outputTokens || 0)}`) +
+          (reasoning > 0 ? chalk.gray(`(思考 ${fmtTok(reasoning)})`) : '') +
+          chalk.gray(` · 累计 ↑${fmtTok(sessionUsage.input)} ↓${fmtTok(sessionUsage.output)}`) +
+          (sessionUsage.cached > 0 ? chalk.green(` · 缓存共 ${fmtTok(sessionUsage.cached)}`) : '')
+        );
+      }
 
       if (reply.tool_calls && reply.tool_calls.length > 0) {
         this.messages.push(reply);
