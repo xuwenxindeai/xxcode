@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyDefaults = applyDefaults;
 exports.withToolSafety = withToolSafety;
+// 这些工具可能合法地长时间运行（装依赖 / 跑命令 / 起服务），超时放宽
+const SHELL_LIKE = new Set(['run_shell', 'docker_exec', 'docker_compose', 'npm_manage', 'pip_manage', 'python_repl', 'start_http_server', 'ssh_exec', 'curl_request']);
 /**
  * 读取 JSON schema 里声明的默认值，填充缺失（undefined/null）的参数。
  *
@@ -40,12 +42,23 @@ function withToolSafety(tool) {
             if (missing.length > 0) {
                 return { success: false, output: '', error: `缺少必填参数: ${missing.join(', ')}` };
             }
+            const timeoutMs = SHELL_LIKE.has(tool.name) ? 300_000 : 90_000;
+            let timer;
             try {
-                // 调用原始 execute（保留 this 绑定到原工具对象）
-                return await tool.execute(args, cwd);
+                // 整体超时：防止个别工具（网络 / 浏览器 / docker）永久挂起卡死 Agent 主循环
+                return await Promise.race([
+                    tool.execute(args, cwd),
+                    new Promise((_, reject) => {
+                        timer = setTimeout(() => reject(new Error(`工具 ${tool.name} 执行超时（${timeoutMs / 1000}s）`)), timeoutMs);
+                    }),
+                ]);
             }
             catch (e) {
                 return { success: false, output: '', error: e?.message || String(e) };
+            }
+            finally {
+                if (timer)
+                    clearTimeout(timer);
             }
         },
     };

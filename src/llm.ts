@@ -106,6 +106,7 @@ export async function chat(model: string, messages: Message[], tools?: any[]): P
   const { system, rest } = splitSystem(messages);
   const { text, toolCalls } = await generateText({
     model: getModel(model),
+    maxRetries: 3,
     ...(system ? { system } : {}),
     messages: toModelMessages(rest),
     ...(hasTools ? { tools: aiTools, toolChoice: 'auto' as const } : {}),
@@ -132,6 +133,7 @@ export async function chatStreaming(
   const { system, rest } = splitSystem(messages);
   const result = streamText({
     model: getModel(model),
+    maxRetries: 3,
     ...(system ? { system } : {}),
     messages: toModelMessages(rest),
     ...(hasTools ? { tools: aiTools, toolChoice: 'auto' as const } : {}),

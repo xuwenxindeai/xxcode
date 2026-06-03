@@ -115,6 +115,7 @@ async function chat(model, messages, tools) {
     const { system, rest } = splitSystem(messages);
     const { text, toolCalls } = await (0, ai_1.generateText)({
         model: getModel(model),
+        maxRetries: 3,
         ...(system ? { system } : {}),
         messages: toModelMessages(rest),
         ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
@@ -136,6 +137,7 @@ async function chatStreaming(model, messages, tools, onChunk) {
     const { system, rest } = splitSystem(messages);
     const result = (0, ai_1.streamText)({
         model: getModel(model),
+        maxRetries: 3,
         ...(system ? { system } : {}),
         messages: toModelMessages(rest),
         ...(hasTools ? { tools: aiTools, toolChoice: 'auto' } : {}),
