@@ -72,12 +72,13 @@ function fmtTok(n: number): string {
   return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 }
 
-function renderStatusBar(round: number, tokens: number, toolsUsed: number) {
+function renderStatusBar(round: number, tokens: number, toolsUsed: number, isReal = false) {
   const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : String(tokens);
+  const tokLabel = isReal ? `📊 ${tk} tokens` : `📊 ~${tk} tokens(估算)`;
   process.stdout.write(
     `\n${chalk.gray('───')} ` +
     `${chalk.cyan(`🔄 第 ${round} 轮`)} ${chalk.gray('·')} ` +
-    `${chalk.yellow(`📊 ~${tk} tokens`)} ${chalk.gray('·')} ` +
+    `${chalk.yellow(tokLabel)} ${chalk.gray('·')} ` +
     `${chalk.green(`🔧 工具 ${toolsUsed}`)} ${chalk.gray('─'.repeat(18))}\n`
   );
 }
@@ -445,7 +446,7 @@ export class Agent {
       const currentTokens = realInput ?? estimateTokens(compressed);
 
       // 每轮一行紧凑状态（流式，与下面的 LLM 输出/工具日志顺序衔接）
-      renderStatusBar(iteration, currentTokens, this.totalToolCalls);
+      renderStatusBar(iteration, currentTokens, this.totalToolCalls, realInput != null);
       startSpinner('思考中...');
 
       const reply = await llm.chatStreaming(

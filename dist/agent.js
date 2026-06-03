@@ -104,11 +104,12 @@ function stopSpinner() {
 function fmtTok(n) {
     return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 }
-function renderStatusBar(round, tokens, toolsUsed) {
+function renderStatusBar(round, tokens, toolsUsed, isReal = false) {
     const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : String(tokens);
+    const tokLabel = isReal ? `📊 ${tk} tokens` : `📊 ~${tk} tokens(估算)`;
     process.stdout.write(`\n${chalk_1.default.gray('───')} ` +
         `${chalk_1.default.cyan(`🔄 第 ${round} 轮`)} ${chalk_1.default.gray('·')} ` +
-        `${chalk_1.default.yellow(`📊 ~${tk} tokens`)} ${chalk_1.default.gray('·')} ` +
+        `${chalk_1.default.yellow(tokLabel)} ${chalk_1.default.gray('·')} ` +
         `${chalk_1.default.green(`🔧 工具 ${toolsUsed}`)} ${chalk_1.default.gray('─'.repeat(18))}\n`);
 }
 // 把工具参数压成简洁摘要：shell 显示命令、文件类显示路径、否则取前几个 key: val
@@ -429,7 +430,7 @@ class Agent {
             const realInput = llm.getLastUsage().inputTokens;
             const currentTokens = realInput ?? (0, context_1.estimateTokens)(compressed);
             // 每轮一行紧凑状态（流式，与下面的 LLM 输出/工具日志顺序衔接）
-            renderStatusBar(iteration, currentTokens, this.totalToolCalls);
+            renderStatusBar(iteration, currentTokens, this.totalToolCalls, realInput != null);
             startSpinner('思考中...');
             const reply = await llm.chatStreaming(this.config.model, compressed, (0, tools_1.toOpenAIFormat)(), (text) => {
                 if (spinnerInterval)
