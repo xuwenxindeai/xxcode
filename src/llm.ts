@@ -30,6 +30,7 @@ export function initClient(apiKey: string, baseURL?: string, provider: ProviderK
       name: 'xxcode',
       baseURL: baseURL || 'https://api.openai.com/v1',
       apiKey,
+      includeUsage: true, // 流式带 stream_options.include_usage，拿到真实 token usage（DashScope 默认不回，需要这个）
     });
     getModel = (id: string) => p(id);
   }

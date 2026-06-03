@@ -36,6 +36,7 @@ function initClient(apiKey, baseURL, provider = 'openai-compatible') {
             name: 'xxcode',
             baseURL: baseURL || 'https://api.openai.com/v1',
             apiKey,
+            includeUsage: true, // 流式带 stream_options.include_usage，拿到真实 token usage（DashScope 默认不回，需要这个）
         });
         getModel = (id) => p(id);
     }
