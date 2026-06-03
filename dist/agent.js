@@ -104,13 +104,11 @@ function stopSpinner() {
 function fmtTok(n) {
     return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 }
-function renderStatusBar(round, tokens, toolsUsed, isReal = false) {
-    const tk = tokens >= 1000 ? (tokens / 1000).toFixed(1) + 'K' : String(tokens);
-    const tokLabel = isReal ? `📊 ${tk} tokens` : `📊 ~${tk} tokens(估算)`;
+function renderStatusBar(round, toolsUsed) {
+    // token 不在这里显示（调用前只能估算且漏算工具定义，误导）；真实用量交给每次请求后的 💰 行
     process.stdout.write(`\n${chalk_1.default.gray('───')} ` +
         `${chalk_1.default.cyan(`🔄 第 ${round} 轮`)} ${chalk_1.default.gray('·')} ` +
-        `${chalk_1.default.yellow(tokLabel)} ${chalk_1.default.gray('·')} ` +
-        `${chalk_1.default.green(`🔧 工具 ${toolsUsed}`)} ${chalk_1.default.gray('─'.repeat(18))}\n`);
+        `${chalk_1.default.green(`🔧 工具 ${toolsUsed}`)} ${chalk_1.default.gray('─'.repeat(30))}\n`);
 }
 // 把工具参数压成简洁摘要：shell 显示命令、文件类显示路径、否则取前几个 key: val
 function summarizeArgs(fn) {
@@ -427,10 +425,8 @@ class Agent {
             }
             const compressed = (0, context_1.compressMessages)(this.messages, this.agentConfig.maxContextTokens);
             // 显示优先用真实 usage（上一轮的输入 token），部分 provider 不回传则退回估算
-            const realInput = llm.getLastUsage().inputTokens;
-            const currentTokens = realInput ?? (0, context_1.estimateTokens)(compressed);
-            // 每轮一行紧凑状态（流式，与下面的 LLM 输出/工具日志顺序衔接）
-            renderStatusBar(iteration, currentTokens, this.totalToolCalls, realInput != null);
+            // 每轮一行紧凑状态；token 用量交给下面的 💰 行显示真实值，状态行不再放误导的估算
+            renderStatusBar(iteration, this.totalToolCalls);
             startSpinner('思考中...');
             const reply = await llm.chatStreaming(this.config.model, compressed, (0, tools_1.toOpenAIFormat)(), (text) => {
                 if (spinnerInterval)
